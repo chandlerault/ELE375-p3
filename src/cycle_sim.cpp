@@ -747,7 +747,6 @@ enum INST_TYPE
     J
 };
 
-
 struct RData
 {
     uint8_t opcode;
@@ -763,8 +762,9 @@ struct IData
 {
     uint8_t opcode;
     uint32_t rsValue;
-    uint8_t rs;
     uint32_t rtValue;
+    uint8_t rs;
+    uint8_t rt;
     uint16_t imm;
     uint32_t seImm;
     uint32_t zeImm;
@@ -785,6 +785,54 @@ struct InstructionData
         JData jData;
     } data;
     INST_TYPE tag;
+
+    uint8_t rs() {
+        switch (this->tag) {
+        case R:
+            return this->data.rData.rs;
+        case I:
+            return this->data.iData.rs;
+        case J:
+            return 0;
+        }
+    }
+
+    uint8_t rt() {
+        switch (this->tag) {
+        case R:
+            return this->data.rData.rt;
+        case I:
+            return this->data.iData.rt;
+        case J:
+            return 0;
+        }
+    }
+
+    void rsValue(uint64_t val) {
+        switch (this->tag) {
+        case R:
+            this->data.rData.rsValue = val;
+            break;
+        case I:
+            this->data.iData.rsValue = val;
+            break;
+        case J:
+            break;
+        }
+    }
+
+    void rtValue(uint64_t val) {
+        switch (this->tag) {
+        case R:
+            this->data.rData.rtValue = val;
+            break;
+        case I:
+            this->data.iData.rtValue = val;
+            break;
+        case J:
+            break;
+        }
+    }
 };
 
 struct IFID
@@ -799,55 +847,60 @@ struct IDEX
     InstructionData instructionData;
 };
 
-struct EXMEM {
+struct EXMEM
+{
     uint32_t instruction;
     InstructionData instructionData;
-    uint64_t newRtValue = UINT64_MAX;
-    uint64_t newRdValue = UINT64_MAX;
+    uint64_t regWriteValue = UINT64_MAX;
+    uint8_t regToWrite;
 };
+
+using MEMWB = EXMEM;
 
 struct Cache
 {
 };
 
-uint8_t getOpcode(uint32_t instr) {
+uint8_t getOpcode(uint32_t instr)
+{
     return (instr >> 21) & 0x1f;
 }
 
 // Arg: current opcode
 // Return: enum INST_TYPE tag associated with instruction being executed
-enum INST_TYPE getInstType(uint32_t instr) {
+enum INST_TYPE getInstType(uint32_t instr)
+{
     uint8_t opcode = getOpcode(instr);
     switch (opcode)
     {
-        case OP_ZERO:
-            return R;
-            break;
-        case OP_ADDI:
-        case OP_ADDIU:
-        case OP_ANDI:
-        case OP_BEQ:
-        case OP_BNE:
-        case OP_LBU:
-        case OP_LHU:
-        case OP_LL:
-        case OP_LUI:
-        case OP_LW:
-        case OP_ORI:
-        case OP_SLTI:
-        case OP_SLTIU:
-        case OP_SB:
-        case OP_SC:
-        case OP_SH:
-        case OP_SW:
-            return I;
-            break;
-        case OP_J:
-        case OP_JAL:
-            return J;
-            break;
+    case OP_ZERO:
+        return R;
+        break;
+    case OP_ADDI:
+    case OP_ADDIU:
+    case OP_ANDI:
+    case OP_BEQ:
+    case OP_BNE:
+    case OP_LBU:
+    case OP_LHU:
+    case OP_LL:
+    case OP_LUI:
+    case OP_LW:
+    case OP_ORI:
+    case OP_SLTI:
+    case OP_SLTIU:
+    case OP_SB:
+    case OP_SC:
+    case OP_SH:
+    case OP_SW:
+        return I;
+        break;
+    case OP_J:
+    case OP_JAL:
+        return J;
+        break;
     }
-} 
+}
 
 // Arg: current instruction
 // Return: struct RData holding relevant register instruction data
@@ -856,14 +909,14 @@ struct RData getRData(uint32_t instr)
     uint8_t rs = (instr >> 21) & 0x1f;
     uint8_t rt = (instr >> 16) & 0x1f;
     struct RData rData = {
-        getOpcode(instr),       // uint8_t opcode;
-        regs[rs],                   // uint32_t rsValue;
-        regs[rt],                   // uint32_t rtValue;
+        getOpcode(instr), // uint8_t opcode;
+        regs[rs],         // uint32_t rsValue;
+        regs[rt],         // uint32_t rtValue;
         rs,
         rt,
-        (instr >> 11) & 0x1f,       // uint8_t rd
-        (instr >> 6) & 0x1f,        // uint8_t shamt
-        instr & 0x3f                // uint8_tfunct
+        (instr >> 11) & 0x1f, // uint8_t rd
+        (instr >> 6) & 0x1f,  // uint8_t shamt
+        instr & 0x3f          // uint8_tfunct
     };
 
     return rData;
@@ -874,12 +927,14 @@ struct RData getRData(uint32_t instr)
 struct IData getIData(uint32_t instr)
 {
     uint8_t rs = (instr >> 21) & 0x1f;
+    uint8_t rt = (instr >> 16) & 0x1f;
     uint16_t imm = instr & 0xffff;
     struct IData iData = {
         getOpcode(instr),                                                       // uint8_t opcode;
         regs[rs],                                                               // uint32_t rsValue;
-        rs,                                                                     // uint8_t rs
-        regs[(instr >> 16) & 0x1f],                                             // uint32_t rtValue;
+        regs[rt],                                                               // uint32_t rtValue;
+        rs,                                                                     // uint8_t rs;
+        rt,                                                                     // uint8_t rt;
         imm,                                                                    // uint16_t imm;
         static_cast<uint32_t>(static_cast<int32_t>(static_cast<int16_t>(imm))), // uint32_t seImm;
         imm,                                                                    // uint32_t zeImm;
@@ -893,9 +948,9 @@ struct IData getIData(uint32_t instr)
 struct JData getJData(uint32_t instr)
 {
     struct JData jData = {
-        getOpcode(instr), // uint8_t opcode;
-        instr & 0x3ffffff,    // uint32_t addr;
-        ifid.pc               // uint32_t oldPC;
+        getOpcode(instr),  // uint8_t opcode;
+        instr & 0x3ffffff, // uint32_t addr;
+        ifid.pc            // uint32_t oldPC;
     };
 
     return jData;
@@ -937,6 +992,7 @@ MemoryStore *memStore;
 IFID ifid;
 IDEX idex;
 EXMEM exmem;
+MEMWB memwb;
 
 int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mainMem)
 {
@@ -948,7 +1004,8 @@ void runCycle()
 {
     IFID nextIfid;
     IDEX nextIdex;
-    EXMEM nextExMem;
+    EXMEM nextExmem;
+    MEMWB nextMemwb;
 
     // instructionFetch
     auto instruction = getCacheValue(&dcache, memStore, pipeState.cycle, pc, MemEntrySize::WORD_SIZE);
@@ -972,32 +1029,37 @@ void runCycle()
     case I:
     {
         auto iData = getIData(ifid.instruction);
-        switch (iData.opcode) {
-            case OP_BEQ:
-                if (iData.rsValue == iData.rtValue) {
-                    pc = ifid.pc + (iData.imm << 2);
-                    break;
-                }
+        switch (iData.opcode)
+        {
+        case OP_BEQ:
+            if (iData.rsValue == iData.rtValue)
+            {
+                pc = ifid.pc + (iData.imm << 2);
                 break;
-            case OP_BNE:
-                if (iData.rsValue != iData.rtValue) {
-                    pc = ifid.pc + (iData.imm << 2);
-                    break;
-                } 
+            }
+            break;
+        case OP_BNE:
+            if (iData.rsValue != iData.rtValue)
+            {
+                pc = ifid.pc + (iData.imm << 2);
                 break;
-            case OP_BGTZ:
-                if (iData.rsValue > 0) {
-                    pc = ifid.pc + (iData.imm << 2);
-                    break;
-                }
+            }
+            break;
+        case OP_BGTZ:
+            if (iData.rsValue > 0)
+            {
+                pc = ifid.pc + (iData.imm << 2);
                 break;
-             case OP_BLEZ:
-                if (iData.rsValue <= 0) {
-                    pc = ifid.pc + (iData.imm << 2);
-                    break;
-                }
+            }
+            break;
+        case OP_BLEZ:
+            if (iData.rsValue <= 0)
+            {
+                pc = ifid.pc + (iData.imm << 2);
                 break;
-            default:
+            }
+            break;
+        default:
         }
         nextIdex.instructionData.data.iData = iData;
         break;
@@ -1005,31 +1067,43 @@ void runCycle()
     case J:
     {
         auto jData = getJData(ifid.instruction);
-        switch (jData.opcode) {
-            case OP_JAL:
-                // TODO: what to do, WB is weird 
-            case OP_J:
-                pc = ((ifid.pc + 4) & 0xf0000000) | (jData.addr << 2);
-                break;
-            
-            default:
+        switch (jData.opcode)
+        {
+        case OP_JAL:
+            // TODO: what to do, WB is weird
+        case OP_J:
+            pc = ((ifid.pc + 4) & 0xf0000000) | (jData.addr << 2);
+            break;
+
+        default:
         }
         nextIdex.instructionData.data.jData = jData;
         break;
     }
     }
+    nextIdex.instruction = ifid.instruction;
 
     // execute
 
-    // TODO: execute forwarding logic from mem and wb stages
+    // forwarding of results from previous cycle's execute
+    if (exmem.regWriteValue != UINT64_MAX && exmem.regToWrite != 0) {
+        if (exmem.regToWrite == idex.instructionData.rs()) {
+            idex.instructionData.rsValue(exmem.regWriteValue);
+        }
+        if (exmem.regToWrite == exmem.instructionData.rt()) {
+            exmem.instructionData.rtValue(exmem.regWriteValue);
+        }
+    }
 
     switch (idex.instructionData.tag)
     {
     case R:
-        handleRInstEx(idex.instructionData.data.rData);
+        nextExmem.regWriteValue = handleRInstEx(idex.instructionData.data.rData);
+        nextMemwb.regToWrite = idex.instructionData.data.rData.rd;
         break;
     case I:
-        handleImmInstEx(idex.instructionData.data.iData);
+        nextExmem.regWriteValue = handleImmInstEx(idex.instructionData.data.iData);
+        nextMemwb.regToWrite = idex.instructionData.data.iData.rt;
         break;
     case J:
     {
@@ -1037,10 +1111,27 @@ void runCycle()
         break;
     }
     }
+    nextExmem.instruction = idex.instruction;
+    nextExmem.instructionData = idex.instructionData;
 
     // mem
+    switch (exmem.instructionData.tag) {
+        case I:
+            // TODO: handle stalls
+            handleMem(exmem.instructionData.data.iData);
+    }
+    nextMemwb = exmem;
 
     // writeBack
+    if (memwb.regWriteValue != UINT64_MAX && memwb.regToWrite != 0) {
+        regs[memwb.regToWrite] = memwb.regWriteValue;
+    }
+    
+    // finish cycle
+    ifid = nextIfid;
+    idex = nextIdex;
+    exmem = nextExmem;
+    memwb = nextMemwb;
 }
 
 // returns new value of rd, or UINT64_MAX if none
@@ -1087,7 +1178,7 @@ uint64_t handleRInstEx(RData &rData)
         cerr << "Illegal instruction at address "
              << "0x" << hex
              << setfill('0') << setw(8) << progCounter << endl;
-             exit(1);
+        exit(1);
         break;
     }
 
@@ -1107,28 +1198,6 @@ uint64_t handleImmInstEx(IData &iData)
         break;
     case OP_ANDI:
         rtValue = iData.rsValue & iData.zeImm;
-        break;
-    case OP_BEQ:
-        // //Note that signs don't matter when you're checking for equality :).
-        // if(regs[rs] == regs[rt])
-        // {
-        //     //MIPS multiplies immediates by 4 for branches...
-        //     progCounter += 4 + ((static_cast<int32_t>(seImm)) << 2);
-        //     //Note that if the branch is not taken, we don't need to do anything with
-        //     //regard to delay slots. The instruction after the branch will be executed
-        //     //as required by the regular straight-line execution logic.
-        //     ret = NOINC_PC;
-        // }
-        // TODO!!
-        break;
-    case OP_BNE:
-        // //See also notes for BEQ above.
-        // if(regs[rs] != regs[rt])
-        // {
-        //     progCounter += 4 + ((static_cast<int32_t>(seImm)) << 2);
-        //     ret = NOINC_PC;
-        // }
-        // TODO!!
         break;
     case OP_LBU:
     case OP_LHU:
@@ -1171,4 +1240,33 @@ int handleJInstEx(JData &jData)
     }
 
     return -1;
+}
+
+// returns non zero on mem failure
+int handleMem(IData &iData)
+{
+    uint32_t addr = iData.rsValue + iData.seImm;
+    uint32_t data = 0;
+    // TODO: perform operations through cache 
+    // and overall clean this up
+    switch (iData.opcode)
+    {
+    case OP_SB:
+        return memStore->setMemValue(addr, iData.rtValue & 0xFF, BYTE_SIZE);
+    case OP_SH:
+        return memStore->setMemValue(addr, iData.rtValue & 0xFFFF, HALF_SIZE);
+    case OP_SW:
+        return memStore->setMemValue(addr, iData.rtValue, WORD_SIZE);
+     case OP_LBU:
+        ret = doLoad(addr, BYTE_SIZE, rt);
+        break;
+    case OP_LHU:
+        ret = doLoad(addr, HALF_SIZE, rt);
+        break;
+    case OP_LW:
+        ret = doLoad(addr, WORD_SIZE, rt);
+        break;
+    default:
+        return 0;
+    }
 }
