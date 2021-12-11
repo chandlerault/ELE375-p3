@@ -704,28 +704,28 @@ CycleStatus runCycle()
         case OP_BEQ:
             if (iData.rsValue == iData.rtValue)
             {
-                pc = ifid.pc + (iData.imm << 2);
+                pc = ifid.pc + 4 +((static_cast<int32_t>(iData.seImm)) << 2);
                 break;
             }
             break;
         case OP_BNE:
             if (iData.rsValue != iData.rtValue)
             {
-                pc = ifid.pc + (iData.imm << 2);
+                pc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
                 break;
             }
             break;
         case OP_BGTZ:
             if (iData.rsValue > 0)
             {
-                pc = ifid.pc + (iData.imm << 2);
+                pc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
                 break;
             }
             break;
         case OP_BLEZ:
             if (iData.rsValue <= 0)
             {
-                pc = ifid.pc + (iData.imm << 2);
+                pc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
                 break;
             }
             break;
