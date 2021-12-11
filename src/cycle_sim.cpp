@@ -831,6 +831,14 @@ CycleStatus runCycle()
 
     if (memwb.instruction == 0xfeedfeed) cycleStatus = HALTED;
 
+     // update pipe state information
+    pipeState.cycle++;
+    pipeState.ifInstr = nextIfid.instruction;
+    pipeState.idInstr = nextIdex.instruction;
+    pipeState.exInstr = nextExmem.instruction;
+    pipeState.memInstr = nextMemwb.instruction;
+    pipeState.wbInstr = memwb.instruction;
+
     // finish cycle
     if (stallIf || stallId) {
         pc -= 4;
@@ -842,6 +850,8 @@ CycleStatus runCycle()
 
     exmem = nextExmem;
     memwb = nextMemwb;
+
+   
 
     return cycleStatus;
 }
