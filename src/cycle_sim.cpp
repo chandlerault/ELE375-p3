@@ -730,9 +730,9 @@ CycleStatus runCycle()
             }
             break;
         default:
-            nextIdex.instructionData.data.iData = iData;
             break;
         }
+        nextIdex.instructionData.data.iData = iData;
         break;
     }
     case J:
@@ -794,15 +794,17 @@ CycleStatus runCycle()
     {
     case R:
         nextExmem.regWriteValue = handleRInstEx(idex.instructionData.data.rData);
-        nextMemwb.regToWrite = idex.instructionData.data.rData.rd;
+        nextExmem.regToWrite = idex.instructionData.data.rData.rd;
         break;
     case I:
         nextExmem.regWriteValue = handleImmInstEx(idex.instructionData.data.iData);
-        nextMemwb.regToWrite = idex.instructionData.data.iData.rt;
+        nextExmem.regToWrite = idex.instructionData.data.iData.rt;
         break;
     case J:
     {
         handleJInstEx(idex.instructionData.data.jData);
+        nextExmem.regWriteValue = UINT64_MAX;
+        nextExmem.regToWrite = 0;
         break;
     }
     }
@@ -810,12 +812,11 @@ CycleStatus runCycle()
     nextExmem.instructionData = idex.instructionData;
 
     // mem
-    switch (exmem.instructionData.tag)
-    {
-    case I:
+    if (exmem.instructionData.tag == I) {
         // TODO: handle stalls
         handleMem(exmem.instructionData.data.iData);
     }
+
     nextMemwb = exmem;
 
     // writeBack
@@ -827,11 +828,15 @@ CycleStatus runCycle()
     if (memwb.instruction == 0xfeedfeed) cycleStatus = HALTED;
 
     // finish cycle
-    if (stallIf || stallId)
+    if (stallIf || stallId) {
         pc -= 4;
-    if (!stallId)
+    } else if (!stallIf) {
         ifid = nextIfid;
-    idex = nextIdex;
+    }
+        
+    if (!stallId)
+        idex = nextIdex;
+
     exmem = nextExmem;
     memwb = nextMemwb;
 
