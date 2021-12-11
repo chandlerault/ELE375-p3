@@ -773,7 +773,7 @@ CycleStatus runCycle()
         }
         if (memwb.regToWrite == memwb.instructionData.rt())
         { // (and MEM/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
-            memwb.instructionData.rtValue(memwb.regWriteValue);
+            idex.instructionData.rtValue(memwb.regWriteValue);
         }
     }
 
@@ -786,7 +786,7 @@ CycleStatus runCycle()
         }
         if (exmem.regToWrite == exmem.instructionData.rt())
         { // (and EX/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
-            exmem.instructionData.rtValue(exmem.regWriteValue);
+            idex.instructionData.rtValue(exmem.regWriteValue);
         }
     }
 
@@ -830,12 +830,13 @@ CycleStatus runCycle()
     // finish cycle
     if (stallIf || stallId) {
         pc -= 4;
-    } else if (!stallIf) {
+    } else {
         ifid = nextIfid;
     }
         
-    if (!stallId)
+    if (!stallId) {
         idex = nextIdex;
+    }
 
     exmem = nextExmem;
     memwb = nextMemwb;
