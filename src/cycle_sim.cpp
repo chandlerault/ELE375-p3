@@ -221,8 +221,7 @@ struct JData
 
 struct InstructionData
 {
-    union
-    {
+    union {
         RData rData;
         IData iData;
         JData jData;
@@ -238,7 +237,6 @@ struct InstructionData
         default:
             return 0;
         }
-        
     }
 
     uint8_t rt() {
@@ -249,6 +247,7 @@ struct InstructionData
             return this->data.iData.rt;
         default:
             return 0;
+        }
     }
 
     void rsValue(uint64_t val) {
@@ -426,9 +425,9 @@ struct RData getRData(uint32_t instr)
         regs[rt],         // uint32_t rtValue;
         rs,
         rt,
-        (uint8_t)(instr >> 11) & 0x1f, // uint8_t rd
-        (uint8_t)(instr >> 6) & 0x1f,  // uint8_t shamt
-        (uint8_t)instr & 0x3f          // uint8_tfunct
+        (uint8_t)((instr >> 11) & 0x1f), // uint8_t rd
+        (uint8_t)((instr >> 6) & 0x1f),  // uint8_t shamt
+        (uint8_t)(instr & 0x3f)          // uint8_tfunct
     };
 
     return rData;
@@ -694,6 +693,8 @@ void runCycle()
         default:
             nextIdex.instructionData.data.iData = iData;
             break;
+        }
+        break;
     }
     case J:
     {
