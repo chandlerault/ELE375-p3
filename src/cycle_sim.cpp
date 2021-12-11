@@ -6,20 +6,12 @@
 #include "MemoryStore.h"
 #include "RegisterInfo.h"
 #include "EndianHelpers.h"
+#include "CacheConfig.h"
+#include "DriverFunctions.h"
 
-#define MAGIC_DEMARC 0xfeedfeed
 #define EXCEPTION_ADDR 0x8000
-
-//Note that an instruction that modifies the PC will never throw an
-//exception or be prone to errors from the memory abstraction.
-//Thus a single value is enough to depict the status of an instruction.
-#define NOINC_PC 1
-#define OVERFLOW 2
-#define ILLEGAL_INST 3
-
+using namespace std;
 //TODO: Fix the error messages to output the correct PC in case of errors.
-
-extern void dumpRegisterStateInternal(RegisterInfo &reg, std::ostream &reg_out);
 
 enum REG_IDS
 {
@@ -103,504 +95,52 @@ enum FUN_IDS
     FUN_SUBU = 0x23
 };
 
-using namespace std;
-
 //Static global variables...
-static uint32_t progCounter;
 static uint32_t regs[NUM_REGS];
-static MemoryStore *mem;
 
-static bool ll_sc_flag;
-static uint32_t ll_sc_addr;
+// uint8_t getSign(uint32_t value)
+// {
+//     return (value >> 31) & 0x1;
+// }
 
-int initMemory(ifstream &inputProg)
-{
-    if (inputProg && mem)
-    {
-        uint32_t curVal = 0;
-        uint32_t addr = 0;
+// int doAddSub(uint8_t rd, uint32_t s1, uint32_t s2, bool isAdd, bool checkOverflow)
+// {
+//     bool overflow = false;
+//     int32_t result = 0;
 
-        while (inputProg.read((char *)(&curVal), sizeof(uint32_t)))
-        {
-            curVal = ConvertWordToBigEndian(curVal);
-            int ret = mem->setMemValue(addr, curVal, WORD_SIZE);
+//     if (isAdd)
+//     {
+//         result = static_cast<int32_t>(s1) + static_cast<int32_t>(s2);
+//     }
+//     else
+//     {
+//         result = static_cast<int32_t>(s1) - static_cast<int32_t>(s2);
+//     }
 
-            if (ret)
-            {
-                cout << "Could not set memory value!" << endl;
-                return -EINVAL;
-            }
+//     if (checkOverflow)
+//     {
+//         if (isAdd)
+//         {
+//             overflow = getSign(s1) == getSign(s2) && getSign(s2) != getSign(result);
+//         }
+//         else
+//         {
+//             overflow = getSign(s1) != getSign(s2) && getSign(s2) == getSign(result);
+//         }
+//     }
 
-            //We're reading 4 bytes each time...
-            addr += 4;
-        }
-    }
-    else
-    {
-        cout << "Invalid file stream or memory image passed, could not initialise memory values" << endl;
-        return -EINVAL;
-    }
+//     if (overflow)
+//     {
+//         //Inform the caller that overflow occurred so it can take appropriate action.
+//         return OVERFLOW;
+//     }
 
-    return 0;
-}
+//     //Otherwise update state and return success.
+//     regs[rd] = static_cast<uint32_t>(result);
 
-//Byte's the smallest thing that can hold the opcode...
-uint8_t getOpcode(uint32_t instr)
-{
-    return (uint8_t)((instr >> 26) & 0x3f);
-}
+//     return 0;
+// }
 
-uint8_t getSign(uint32_t value)
-{
-    return (value >> 31) & 0x1;
-}
-
-int doAddSub(uint8_t rd, uint32_t s1, uint32_t s2, bool isAdd, bool checkOverflow)
-{
-    bool overflow = false;
-    int32_t result = 0;
-
-    if (isAdd)
-    {
-        result = static_cast<int32_t>(s1) + static_cast<int32_t>(s2);
-    }
-    else
-    {
-        result = static_cast<int32_t>(s1) - static_cast<int32_t>(s2);
-    }
-
-    if (checkOverflow)
-    {
-        if (isAdd)
-        {
-            overflow = getSign(s1) == getSign(s2) && getSign(s2) != getSign(result);
-        }
-        else
-        {
-            overflow = getSign(s1) != getSign(s2) && getSign(s2) == getSign(result);
-        }
-    }
-
-    if (overflow)
-    {
-        //Inform the caller that overflow occurred so it can take appropriate action.
-        return OVERFLOW;
-    }
-
-    //Otherwise update state and return success.
-    regs[rd] = static_cast<uint32_t>(result);
-
-    return 0;
-}
-
-int runDelayInstruction(uint32_t delayPC, int succRet);
-
-int handleOpZeroInst(uint32_t instr)
-{
-    uint8_t rs = (instr >> 21) & 0x1f;
-    uint8_t rt = (instr >> 16) & 0x1f;
-    uint8_t rd = (instr >> 11) & 0x1f;
-    uint8_t shamt = (instr >> 6) & 0x1f;
-    uint8_t funct = instr & 0x3f;
-
-    int ret = 0;
-    uint32_t oldPC = progCounter;
-
-    switch (funct)
-    {
-    case FUN_ADD:
-        ret = doAddSub(rd, regs[rs], regs[rt], true, true);
-        break;
-    case FUN_ADDU:
-        //No overflow...
-        ret = doAddSub(rd, regs[rs], regs[rt], true, false);
-        break;
-    case FUN_AND:
-        regs[rd] = regs[rs] & regs[rt];
-        break;
-    case FUN_JR:
-        progCounter = regs[rs];
-        ret = NOINC_PC;
-        break;
-    case FUN_NOR:
-        regs[rd] = ~(regs[rs] | regs[rt]);
-        break;
-    case FUN_OR:
-        regs[rd] = regs[rs] | regs[rt];
-        break;
-    case FUN_SLT:
-        regs[rd] = (static_cast<int32_t>(regs[rs]) < static_cast<int32_t>(regs[rt])) ? 1 : 0;
-        break;
-    case FUN_SLTU:
-        regs[rd] = (regs[rs] < regs[rt]) ? 1 : 0;
-        break;
-    case FUN_SLL:
-        regs[rd] = regs[rt] << shamt;
-        break;
-    case FUN_SRL:
-        regs[rd] = regs[rt] >> shamt;
-        break;
-    case FUN_SUB:
-        ret = doAddSub(rd, regs[rs], regs[rt], false, true);
-        break;
-    case FUN_SUBU:
-        //No overflow...
-        ret = doAddSub(rd, regs[rs], regs[rt], false, false);
-        break;
-    default:
-        //Illegal instruction. Trigger an exception.
-        ret = ILLEGAL_INST;
-        cerr << "Illegal instruction at address "
-             << "0x" << hex
-             << setfill('0') << setw(8) << progCounter << endl;
-        break;
-    }
-
-    //Reset the zero register...
-    regs[REG_ZERO] = 0;
-
-    //Did this instruction throw an exception or fail? If so, just return that
-    //and do nothing further.
-    if (ret && ret != NOINC_PC)
-    {
-        return ret;
-    }
-
-    //Did this instruction modify the PC? If so, execute the instruction
-    //in the delay slot and then return the return value of the immediate
-    //instruction's execution unless the delay slot instruction throws an exception,
-    //in which case just return the exception of that delay instruction.
-    if (ret == NOINC_PC)
-    {
-        return runDelayInstruction(oldPC + 4, NOINC_PC);
-    }
-
-    //The ret value must be 0 here, or something's amiss.
-    if (ret != 0)
-    {
-        cerr << "ret was nonzero - check logic!" << endl;
-    }
-
-    return 0;
-}
-
-int doLoad(uint32_t addr, MemEntrySize size, uint8_t rt)
-{
-    uint32_t value = 0;
-    int ret = 0;
-    ret = mem->getMemValue(addr, value, size);
-    if (ret)
-    {
-        cout << "Could not get mem value" << endl;
-        return ret;
-    }
-
-    switch (size)
-    {
-    case BYTE_SIZE:
-        regs[rt] = value & 0xFF;
-        break;
-    case HALF_SIZE:
-        regs[rt] = value & 0xFFFF;
-        break;
-    case WORD_SIZE:
-        regs[rt] = value;
-        break;
-    default:
-        cerr << "Invalid size passed, cannot read/write memory" << endl;
-        return -EINVAL;
-    }
-
-    return 0;
-}
-
-void checkLLSCOverlap(uint32_t addr, MemEntrySize size)
-{
-    if (!ll_sc_flag)
-    {
-        //Atomicity either doesn't need to be checked or has already been broken,
-        //so there's nothing to do here.
-        return;
-    }
-
-    uint32_t store_start = addr;
-    uint32_t store_end = addr + static_cast<uint32_t>(size);
-    uint32_t ll_sc_start = ll_sc_addr;
-    uint32_t ll_sc_end = ll_sc_addr + static_cast<uint32_t>(WORD_SIZE);
-
-    if ((store_start >= ll_sc_start && store_start < ll_sc_end) ||
-        (store_end > ll_sc_start && store_end <= ll_sc_end))
-    {
-        //We have an overlap.
-        ll_sc_flag = false;
-    }
-}
-
-//TODO: Do address calculations that overflow cause an overflow exception?
-//Probably not, because memory is always addressed by UNSIGNED numbers, not signed ones.
-int handleImmInst(uint32_t instr)
-{
-    uint8_t opcode = (instr >> 26) & 0x3f;
-    uint8_t rs = (instr >> 21) & 0x1f;
-    uint8_t rt = (instr >> 16) & 0x1f;
-    uint16_t imm = instr & 0xffff;
-    //Sign extend the immediate...
-    uint32_t seImm = static_cast<uint32_t>(static_cast<int32_t>(static_cast<int16_t>(imm)));
-    uint32_t zeImm = imm;
-
-    int ret = 0;
-    uint32_t addr = static_cast<uint32_t>(static_cast<int32_t>(regs[rs]) + static_cast<int32_t>(seImm));
-    uint32_t value = 0;
-    uint32_t oldPC = progCounter;
-
-    switch (opcode)
-    {
-    case OP_ADDI:
-        ret = doAddSub(rt, regs[rs], seImm, true, true);
-        break;
-    case OP_ADDIU:
-        ret = doAddSub(rt, regs[rs], seImm, true, false);
-        break;
-    case OP_ANDI:
-        regs[rt] = regs[rs] & zeImm;
-        break;
-    case OP_BEQ:
-        //Note that signs don't matter when you're checking for equality :).
-        if (regs[rs] == regs[rt])
-        {
-            //MIPS multiplies immediates by 4 for branches...
-            progCounter += 4 + ((static_cast<int32_t>(seImm)) << 2);
-            //Note that if the branch is not taken, we don't need to do anything with
-            //regard to delay slots. The instruction after the branch will be executed
-            //as required by the regular straight-line execution logic.
-            ret = NOINC_PC;
-        }
-        break;
-    case OP_BNE:
-        //See also notes for BEQ above.
-        if (regs[rs] != regs[rt])
-        {
-            progCounter += 4 + ((static_cast<int32_t>(seImm)) << 2);
-            ret = NOINC_PC;
-        }
-        break;
-    case OP_LBU:
-        ret = doLoad(addr, BYTE_SIZE, rt);
-        break;
-    case OP_LHU:
-        ret = doLoad(addr, HALF_SIZE, rt);
-        break;
-    case OP_LL:
-        //Set the ll_sc_flag. It'll be cleared on any exception or when the SC succeeds,
-        //or if there's an intervening store that overlaps with the ll word in any way.
-        ll_sc_flag = true;
-        ll_sc_addr = addr;
-        ret = doLoad(addr, WORD_SIZE, rt);
-        break;
-    case OP_LUI:
-        regs[rt] = static_cast<uint32_t>(imm) << 16;
-        break;
-    case OP_LW:
-        ret = doLoad(addr, WORD_SIZE, rt);
-        break;
-    case OP_ORI:
-        regs[rt] = regs[rs] | zeImm;
-        break;
-    case OP_SLTI:
-        regs[rt] = (static_cast<int32_t>(regs[rs]) < static_cast<int32_t>(seImm)) ? 1 : 0;
-        break;
-    case OP_SLTIU:
-        regs[rt] = (regs[rs] < static_cast<uint32_t>(seImm)) ? 1 : 0;
-        break;
-    case OP_SB:
-        ret = mem->setMemValue(addr, regs[rt] & 0xFF, BYTE_SIZE);
-        checkLLSCOverlap(addr, BYTE_SIZE);
-        break;
-    case OP_SC:
-        if (addr == ll_sc_addr)
-        {
-            if (ll_sc_flag)
-            {
-                //We are atomic. Store the value.
-                ret = mem->setMemValue(addr, regs[rt], WORD_SIZE);
-            }
-
-            regs[rt] = (ll_sc_flag) ? 1 : 0;
-        }
-        else
-        {
-            regs[rt] = 0;
-        }
-        ll_sc_flag = false;
-        break;
-    case OP_SH:
-        ret = mem->setMemValue(addr, regs[rt] & 0xFFFF, HALF_SIZE);
-        checkLLSCOverlap(addr, HALF_SIZE);
-        break;
-    case OP_SW:
-        ret = mem->setMemValue(addr, regs[rt], WORD_SIZE);
-        checkLLSCOverlap(addr, WORD_SIZE);
-        break;
-    }
-
-    //Reset the zero register...
-    regs[REG_ZERO] = 0;
-
-    //Did this instruction throw an exception or fail? If so, just return that
-    //and do nothing further.
-    if (ret && ret != NOINC_PC)
-    {
-        return ret;
-    }
-
-    //Did this instruction modify the PC? If so, execute the instruction
-    //in the delay slot and then return the return value of the immediate
-    //instruction's execution unless the delay slot instruction throws an exception,
-    //in which case just return the exception of that delay instruction.
-    if (ret == NOINC_PC)
-    {
-        return runDelayInstruction(oldPC + 4, NOINC_PC);
-    }
-
-    //The ret value must be 0 here, or something's amiss.
-    if (ret != 0)
-    {
-        cerr << "ret was nonzero - check logic!" << endl;
-    }
-
-    return 0;
-}
-
-int handleJInst(uint32_t instr)
-{
-    uint8_t opcode = (instr >> 26) & 0x3f;
-    uint32_t addr = instr & 0x3ffffff;
-    uint32_t oldPC = progCounter;
-
-    switch (opcode)
-    {
-    case OP_JAL:
-        regs[REG_RA] = progCounter + 8;
-        //fall through
-    case OP_J:
-        progCounter = ((progCounter + 4) & 0xf0000000) | (addr << 2);
-        break;
-    }
-
-    //Reset the zero register...
-    regs[REG_ZERO] = 0;
-
-    //Execute the instruction in the delay slot and then return the
-    //return value of the branch's execution
-    //(which is always NOINC_PC because J instrs always modify the PC)
-    //unless the delay slot instruction throws an exception,
-    //in which case just return the exception of that delay instruction.
-    return runDelayInstruction(oldPC + 4, NOINC_PC);
-}
-
-int runInstruction(uint32_t curInst, bool isDelayInst);
-
-int runDelayInstruction(uint32_t delayPC, int succRet)
-{
-    uint32_t delayInst = 0;
-    int ret = mem->getMemValue(delayPC, delayInst, WORD_SIZE);
-    if (ret)
-    {
-        return ret;
-    }
-
-    ret = runInstruction(delayInst, true);
-
-    if (ret)
-    {
-        return ret;
-    }
-
-    return succRet;
-}
-
-int runInstruction(uint32_t curInst)
-{
-    runInstruction(curInst, false);
-}
-
-int runInstruction(uint32_t curInst, bool isDelayInst)
-{
-    int ret = 0;
-
-    switch (getOpcode(curInst))
-    {
-    //Everything with a zero opcode...
-    case OP_ZERO:
-        ret = handleOpZeroInst(curInst);
-        break;
-    case OP_ADDI:
-    case OP_ADDIU:
-    case OP_ANDI:
-    case OP_BEQ:
-    case OP_BNE:
-    case OP_LBU:
-    case OP_LHU:
-    case OP_LL:
-    case OP_LUI:
-    case OP_LW:
-    case OP_ORI:
-    case OP_SLTI:
-    case OP_SLTIU:
-    case OP_SB:
-    case OP_SC:
-    case OP_SH:
-    case OP_SW:
-        ret = handleImmInst(curInst);
-        break;
-    case OP_J:
-    case OP_JAL:
-        ret = handleJInst(curInst);
-        break;
-    default:
-        //Illegal instruction. Trigger an exception.
-        //Note: Since we catch illegal instructions here, the "handle"
-        //instructions don't need to check for illegal instructions.
-        //except for the case with a 0 opcode and illegal function.
-        ret = ILLEGAL_INST;
-        cerr << "Illegal instruction at address "
-             << "0x" << hex
-             << setfill('0') << setw(8) << progCounter << endl;
-        break;
-    }
-
-    if (ret == NOINC_PC)
-    {
-        //Don't increment the PC.
-        return 0;
-    }
-
-    if (ret == OVERFLOW || ret == ILLEGAL_INST)
-    {
-        //There was an exception. Clear the LL/SC flag, set the PC to the
-        //exception address and return 0. This is because nothing
-        //special needs to be done by the calling code except to not increment
-        //the PC - it should just continue execution from what the PC is like
-        //normal. In the case of a regular (non-delay) instruction, this is exactly
-        //what runProgram does. In the case of a delay instruction, returning 0 here
-        //causes the branch before the delay instruction to return NOINC_PC, which
-        //will result in the PC not getting incremented and execution continuing from
-        //whatever the PC is (which is now the exception address), which is exactly
-        //what we want.
-        //Note that this is the only function where progCounter is incremented
-        //(barring the nop case in runProgram).
-        ll_sc_flag = false;
-        progCounter = EXCEPTION_ADDR;
-        return 0;
-    }
-
-    if (!isDelayInst)
-    {
-        progCounter += 4;
-    }
-
-    return ret;
-}
 
 void fillRegisterState(RegisterInfo &reg)
 {
@@ -643,102 +183,6 @@ void fillRegisterState(RegisterInfo &reg)
     reg.fp = regs[REG_FP];
     reg.ra = regs[REG_RA];
 }
-
-//For delayed branches in combination with self-modifying code *shudder*, we should be
-//fine. Each instruction is fetched only once all previous instructions have finished
-//execution, so there should be no problem with stale values, etc.
-int runProgram()
-{
-    while (true)
-    {
-        uint32_t curInst = 0;
-        //Store the current PC for printing out errors...
-        uint32_t curPC = progCounter;
-
-        if (mem->getMemValue(progCounter, curInst, WORD_SIZE))
-        {
-            return -EBADF;
-        }
-
-        //Check for the end of the code segment.
-        if (curInst == MAGIC_DEMARC)
-        {
-            break;
-        }
-
-        int ret = runInstruction(curInst);
-
-        if (ret)
-        {
-            //There was an error executing the instruction.
-            //Note that this won't give appropriate info for delayed branches...TODO: fix this...
-            cerr << "Error executing instruction "
-                 << "0x" << hex << setfill('0')
-                 << setw(8) << curInst << " at address "
-                 << "0x" << curPC << endl;
-            return -EINVAL;
-        }
-
-        //Dump the state of the system after every instruction for debugging purposes.
-        //Commented out by default.
-        /*cout << endl;
-        cout << "Finished executing instruction " << "0x" << hex << setfill('0')
-             << setw(8) << curInst << " at address " << "0x" << curPC << endl;
-        RegisterInfo reg;
-        memset(&reg, 0, sizeof(RegisterInfo));
-        fillRegisterState(reg);
-        dumpRegisterStateInternal(reg, std::cout);
-        dumpMemoryState(mem);*/
-
-        //The PC will be appropriately set by runInstruction.
-        //We don't have to do anything here.
-    }
-}
-
-int main(int argc, char *argv[])
-{
-    if (argc != 2)
-    {
-        cout << "Usage: ./sim <file name>" << endl;
-        return -EINVAL;
-    }
-
-    ifstream prog;
-    prog.open(argv[1], ios::binary | ios::in);
-
-    mem = createMemoryStore();
-
-    if (initMemory(prog))
-    {
-        return -EBADF;
-    }
-
-    for (int i = 0; i < NUM_REGS; i++)
-    {
-        //This'll initialise the zero register appropriately too...
-        regs[i] = 0;
-    }
-
-    //Run the program...
-    progCounter = 0;
-    ll_sc_flag = false;
-
-    runProgram();
-
-    //Set the register values in the struct for printing...
-    RegisterInfo reg;
-    memset(&reg, 0, sizeof(RegisterInfo));
-    fillRegisterState(reg);
-
-    dumpRegisterState(reg);
-    dumpMemoryState(mem);
-
-    delete mem;
-    return 0;
-}
-
-#include "CacheConfig.h"
-#include "DriverFunctions.h"
 
 enum INST_TYPE
 {
@@ -833,6 +277,18 @@ struct InstructionData
             break;
         }
     }
+
+    bool isMemRead() {
+        if (this->tag == I) {
+            switch (this->data.iData.opcode) {
+            case OP_LBU:
+            case OP_LHU:
+            case OP_LW:
+                return true;
+            }
+        }
+        return false;
+    }
 };
 
 struct IFID
@@ -861,6 +317,60 @@ struct Cache
 {
 };
 
+// returns UINT64_MAX if result is not available in the cache yet, the value at the address otherwise
+uint64_t getCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t addr, MemEntrySize size)
+{
+    uint32_t value = 0;
+    int ret = mem->getMemValue(addr, value, size);
+    if (ret)
+    {
+        cout << "Could not get mem value" << endl;
+        exit(1);
+    }
+
+    switch (size)
+    {
+    case BYTE_SIZE:
+        return value & 0xFF;
+        break;
+    case HALF_SIZE:
+        return value & 0xFFFF;
+        break;
+    case WORD_SIZE:
+        return value;
+        break;
+    default:
+        cerr << "Invalid size passed, cannot read/write memory" << endl;
+        exit(1);
+    }
+}
+
+// returns true if value ready, false otherwise 
+bool setCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t addr, MemEntrySize size, uint32_t value) 
+{
+    int ret;
+    switch (size)
+    {
+    case BYTE_SIZE:
+        ret = mem->setMemValue(addr, value & 0xFF, BYTE_SIZE);
+        break;
+    case HALF_SIZE:
+        ret = mem->setMemValue(addr, value & 0xFFFF, HALF_SIZE);
+        break;
+    case WORD_SIZE:
+        ret = mem->setMemValue(addr, value, WORD_SIZE);
+        break;
+    default:
+        cerr << "Unknown mem write word size provided.\n";
+        exit(1);
+    }
+    if (ret) {
+        cerr << "Failed to write to memory address 0x" << std::hex << std::setw(8) << std::setfill('0') << addr << endl;
+    }
+    return true;
+}
+
+// get opcode from instruction
 uint8_t getOpcode(uint32_t instr)
 {
     return (instr >> 21) & 0x1f;
@@ -956,34 +466,6 @@ struct JData getJData(uint32_t instr)
     return jData;
 }
 
-// returns UINT64_MAX if result is not available in the cache yet, the value at the address otherwise
-uint64_t getCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t addr, MemEntrySize size)
-{
-    uint32_t value = 0;
-    int ret = mem->getMemValue(addr, value, size);
-    if (ret)
-    {
-        cout << "Could not get mem value" << endl;
-        exit(1);
-    }
-
-    switch (size)
-    {
-    case BYTE_SIZE:
-        return value & 0xFF;
-        break;
-    case HALF_SIZE:
-        return value & 0xFFFF;
-        break;
-    case WORD_SIZE:
-        return value;
-        break;
-    default:
-        cerr << "Invalid size passed, cannot read/write memory" << endl;
-        exit(1);
-    }
-}
-
 Cache icache;
 Cache dcache;
 PipeState pipeState;
@@ -1000,6 +482,150 @@ int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mai
     memStore = mainMem;
 }
 
+// returns new value of rd, or UINT64_MAX if none
+uint64_t handleRInstEx(RData &rData)
+{
+    uint64_t rdValue = UINT64_MAX;
+    switch (rData.funct)
+    {
+    case FUN_ADD:
+    case FUN_ADDU:
+        rdValue = rData.rsValue + rData.rtValue;
+        break;
+    case FUN_AND:
+        rdValue = rData.rsValue & rData.rtValue;
+        break;
+    case FUN_JR:
+        // progCounter = regs[rs];
+        // ret = NOINC_PC;
+        // TODO!!
+        break;
+    case FUN_NOR:
+        rdValue = ~(rData.rsValue | rData.rtValue);
+        break;
+    case FUN_OR:
+        rdValue = rData.rsValue | rData.rtValue;
+        break;
+    case FUN_SLT:
+        rdValue = (static_cast<int32_t>(rData.rsValue) < static_cast<int32_t>(rData.rtValue)) ? 1 : 0;
+        break;
+    case FUN_SLTU:
+        rdValue = (rData.rsValue < rData.rtValue) ? 1 : 0;
+        break;
+    case FUN_SLL:
+        rdValue = rData.rtValue << rData.shamt;
+        break;
+    case FUN_SRL:
+        rdValue = rData.rsValue >> rData.shamt;
+        break;
+    case FUN_SUB:
+    case FUN_SUBU:
+        rdValue = rData.rsValue = rData.rtValue;
+        break;
+    default:
+        cerr << "Illegal instruction at address "
+             << "0x" << hex
+             << setfill('0') << setw(8) << pc << endl;
+        exit(1);
+        break;
+    }
+
+    return rdValue;
+}
+
+// returns new value of rt destination, or UINT64_MAX if no new value
+uint64_t handleImmInstEx(IData &iData)
+{
+    uint64_t rtValue = UINT64_MAX;
+
+    switch (iData.opcode)
+    {
+    case OP_ADDI:
+    case OP_ADDIU:
+        rtValue = iData.rsValue + iData.seImm;
+        break;
+    case OP_ANDI:
+        rtValue = iData.rsValue & iData.zeImm;
+        break;
+    case OP_LBU:
+    case OP_LHU:
+    case OP_LW:
+        // loads happen in mem stage
+        break;
+    case OP_LUI:
+        rtValue = static_cast<uint32_t>(iData.imm) << 16;
+        break;
+    case OP_ORI:
+        rtValue = iData.rsValue | iData.zeImm;
+        break;
+    case OP_SLTI:
+        rtValue = (static_cast<int32_t>(iData.rsValue) < static_cast<int32_t>(iData.seImm)) ? 1 : 0;
+        break;
+    case OP_SLTIU:
+        rtValue = (iData.rsValue < static_cast<uint32_t>(iData.seImm)) ? 1 : 0;
+        break;
+    case OP_SB:
+    case OP_SH:
+    case OP_SW:
+        // stores happen in mem stage
+        break;
+    }
+
+    return rtValue;
+}
+
+int handleJInstEx(JData &jData)
+{
+    // TODO: is this needed? what to do for jal 
+}
+
+// returns non zero on mem failure
+int handleMem(IData &iData)
+{
+    uint32_t addr = iData.rsValue + iData.seImm;
+    uint32_t data = 0;
+    // TODO: perform operations through cache 
+    // and overall clean this up
+    switch (iData.opcode)
+    {
+    case OP_SB:
+        if (setCacheValue(&dcache, memStore, pipeState.cycle, addr, BYTE_SIZE, iData.rtValue)) {
+            // TODO: stall
+        }
+        break;
+    case OP_SH:
+        if (setCacheValue(&dcache, memStore, pipeState.cycle, addr, HALF_SIZE, iData.rtValue)) {
+            // TODO: stall
+        }
+        break;
+    case OP_SW:
+        if (setCacheValue(&dcache, memStore, pipeState.cycle, addr, WORD_SIZE, iData.rtValue)) {
+            // TODO: stall
+        }
+        break;
+     case OP_LBU:
+        data = getCacheValue(&dcache, memStore, pipeState.cycle, addr, BYTE_SIZE);
+        if (data == UINT64_MAX) {
+            // TODO stall
+        } else iData.rtValue = data;
+        break;
+    case OP_LHU:
+        data = getCacheValue(&dcache, memStore, pipeState.cycle, addr, HALF_SIZE);
+        if (data == UINT64_MAX) {
+            // TODO stall
+        } else iData.rtValue = data;
+        break;
+    case OP_LW:
+        data = getCacheValue(&dcache, memStore, pipeState.cycle, addr, WORD_SIZE);
+        if (data == UINT64_MAX) {
+            // TODO stall
+        } else iData.rtValue = data;
+        break;
+    default:
+        return 0;
+    }
+}
+
 void runCycle()
 {
     IFID nextIfid;
@@ -1007,11 +633,14 @@ void runCycle()
     EXMEM nextExmem;
     MEMWB nextMemwb;
 
+    bool stallIf = false;
+    bool stallId = false;
+
     // instructionFetch
     auto instruction = getCacheValue(&dcache, memStore, pipeState.cycle, pc, MemEntrySize::WORD_SIZE);
     if (instruction == UINT64_MAX)
     {
-        // TODO: stall
+        stallIf = true;
     }
     pc += 4;
     nextIfid.instruction = instruction;
@@ -1083,14 +712,33 @@ void runCycle()
     }
     nextIdex.instruction = ifid.instruction;
 
+    // if (ID/EX.MemRead and
+    //  ((ID/EX.RegisterRt = IF/ID.RegisterRs) or
+    //  (ID/EX.RegisterRt = IF/ID.RegisterRt)))
+    // we need to wait for the memory fetch to succeed
+    auto idexRt = idex.instructionData.rt();
+    if (idex.instructionData.isMemRead() && (idexRt == nextIdex.instructionData.rs() || idexRt == nextIdex.instructionData.rt())) {
+        stallId = true;
+    }
+
     // execute
 
+    // forwarding of results from register data being written back
+    if (memwb.regWriteValue != UINT64_MAX && memwb.regToWrite != 0) {   // if (MEM/WB.RegWrite and (MEM/WB.RegisterRd ≠ 0)
+        if (memwb.regToWrite == idex.instructionData.rs()) {            // (and MEM/WB.registerRd = ID/EX.registerRs)) ForwardA = 01
+            idex.instructionData.rsValue(memwb.regWriteValue);
+        }
+        if (memwb.regToWrite == memwb.instructionData.rt()) {           // (and MEM/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
+            memwb.instructionData.rtValue(memwb.regWriteValue);
+        }
+    }
+
     // forwarding of results from previous cycle's execute
-    if (exmem.regWriteValue != UINT64_MAX && exmem.regToWrite != 0) {
-        if (exmem.regToWrite == idex.instructionData.rs()) {
+    if (exmem.regWriteValue != UINT64_MAX && exmem.regToWrite != 0) {   // if (EX/WB.RegWrite and (EX/WB.RegisterRd ≠ 0)
+        if (exmem.regToWrite == idex.instructionData.rs()) {            // (and EX/WB.registerRd = ID/EX.registerRs)) ForwardA = 01
             idex.instructionData.rsValue(exmem.regWriteValue);
         }
-        if (exmem.regToWrite == exmem.instructionData.rt()) {
+        if (exmem.regToWrite == exmem.instructionData.rt()) {           // (and EX/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
             exmem.instructionData.rtValue(exmem.regWriteValue);
         }
     }
@@ -1128,145 +776,9 @@ void runCycle()
     }
     
     // finish cycle
-    ifid = nextIfid;
+    if (stallIf || stallId) pc -= 4;
+    if (!stallId) ifid = nextIfid;
     idex = nextIdex;
     exmem = nextExmem;
     memwb = nextMemwb;
-}
-
-// returns new value of rd, or UINT64_MAX if none
-uint64_t handleRInstEx(RData &rData)
-{
-    uint64_t rdValue = UINT64_MAX;
-    switch (rData.funct)
-    {
-    case FUN_ADD:
-    case FUN_ADDU:
-        rdValue = rData.rsValue + rData.rtValue;
-        break;
-    case FUN_AND:
-        rdValue = rData.rsValue & rData.rtValue;
-        break;
-    case FUN_JR:
-        // progCounter = regs[rs];
-        // ret = NOINC_PC;
-        // TODO!!
-        break;
-    case FUN_NOR:
-        rdValue = ~(rData.rsValue | rData.rtValue);
-        break;
-    case FUN_OR:
-        rdValue = rData.rsValue | rData.rtValue;
-        break;
-    case FUN_SLT:
-        rdValue = (static_cast<int32_t>(rData.rsValue) < static_cast<int32_t>(rData.rtValue)) ? 1 : 0;
-        break;
-    case FUN_SLTU:
-        rdValue = (rData.rsValue < rData.rtValue) ? 1 : 0;
-        break;
-    case FUN_SLL:
-        rdValue = rData.rtValue << rData.shamt;
-        break;
-    case FUN_SRL:
-        rdValue = rData.rsValue >> rData.shamt;
-        break;
-    case FUN_SUB:
-    case FUN_SUBU:
-        rdValue = rData.rsValue = rData.rtValue;
-        break;
-    default:
-        cerr << "Illegal instruction at address "
-             << "0x" << hex
-             << setfill('0') << setw(8) << progCounter << endl;
-        exit(1);
-        break;
-    }
-
-    return rdValue;
-}
-
-// returns new value of rt destination, or UINT64_MAX if no new value
-uint64_t handleImmInstEx(IData &iData)
-{
-    uint64_t rtValue = UINT64_MAX;
-
-    switch (iData.opcode)
-    {
-    case OP_ADDI:
-    case OP_ADDIU:
-        rtValue = iData.rsValue + iData.seImm;
-        break;
-    case OP_ANDI:
-        rtValue = iData.rsValue & iData.zeImm;
-        break;
-    case OP_LBU:
-    case OP_LHU:
-    case OP_LW:
-        // loads happen in mem stage
-        break;
-    case OP_LUI:
-        rtValue = static_cast<uint32_t>(iData.imm) << 16;
-        break;
-    case OP_ORI:
-        rtValue = iData.rsValue | iData.zeImm;
-        break;
-    case OP_SLTI:
-        rtValue = (static_cast<int32_t>(iData.rsValue) < static_cast<int32_t>(iData.seImm)) ? 1 : 0;
-        break;
-    case OP_SLTIU:
-        rtValue = (iData.rsValue < static_cast<uint32_t>(iData.seImm)) ? 1 : 0;
-        break;
-    case OP_SB:
-    case OP_SH:
-    case OP_SW:
-        // stores happen in mem stage
-        break;
-    }
-
-    return rtValue;
-}
-
-int handleJInstEx(JData &jData)
-{
-    // TODO implement
-    switch (jData.opcode)
-    {
-    case OP_JAL:
-        regs[REG_RA] = progCounter + 8;
-        //fall through
-    case OP_J:
-        progCounter = ((progCounter + 4) & 0xf0000000) | (addr << 2);
-        break;
-    }
-
-    return -1;
-}
-
-// returns non zero on mem failure
-int handleMem(IData &iData)
-{
-    uint32_t addr = iData.rsValue + iData.seImm;
-    uint32_t data = 0;
-    // TODO: perform operations through cache 
-    // and overall clean this up
-    switch (iData.opcode)
-    {
-    case OP_SB:
-        return memStore->setMemValue(addr, iData.rtValue & 0xFF, BYTE_SIZE);
-    case OP_SH:
-        return memStore->setMemValue(addr, iData.rtValue & 0xFFFF, HALF_SIZE);
-    case OP_SW:
-        return memStore->setMemValue(addr, iData.rtValue, WORD_SIZE);
-     case OP_LBU:
-        ret = doLoad(addr, BYTE_SIZE, rt);
-        break;
-    case OP_LHU:
-        ret = doLoad(addr, HALF_SIZE, rt);
-        break;
-    case OP_LW:
-        ret = doLoad(addr, WORD_SIZE, rt);
-        break;
-    default:
-        return 0;
-    }
 }
