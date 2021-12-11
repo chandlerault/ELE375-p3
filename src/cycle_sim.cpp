@@ -668,10 +668,10 @@ enum CycleStatus {
 CycleStatus runCycle()
 {
     CycleStatus cycleStatus{};
-    IFID nextIfid;
-    IDEX nextIdex;
-    EXMEM nextExmem;
-    MEMWB nextMemwb;
+    IFID nextIfid{};
+    IDEX nextIdex{};
+    EXMEM nextExmem{};
+    MEMWB nextMemwb{};
 
     bool stallIf = false;
     bool stallId = false;
