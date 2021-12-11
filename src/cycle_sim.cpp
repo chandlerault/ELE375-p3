@@ -383,7 +383,7 @@ bool setCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t addr
 // get opcode from instruction
 uint8_t getOpcode(uint32_t instr)
 {
-    return (instr >> 21) & 0x1f;
+    return (instr >> 26) & 0x3f;
 }
 
 // Arg: current opcode
