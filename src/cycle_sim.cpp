@@ -760,6 +760,8 @@ CycleStatus runCycle()
     if (idex.instructionData.isMemRead() && idexRt != 0 && (idexRt == nextIdex.instructionData.rs() || idexRt == nextIdex.instructionData.rt()))
     {
         stallId = true;
+        // insert bubble into pipeline
+        nextIdex = IDEX{};
     }
 
     // execute
