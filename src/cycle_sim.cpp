@@ -677,18 +677,18 @@ CycleStatus runCycle()
     bool stallId = false;
 
     // instructionFetch
-    auto instruction = haltSeen ? 0 : getCacheValue(&dcache, memStore, pipeState.cycle, pc, MemEntrySize::WORD_SIZE);
+    auto instruction = haltSeen ? 0 : getCacheValue(&icache, memStore, pipeState.cycle, pc, MemEntrySize::WORD_SIZE);
     if (instruction == UINT64_MAX)
     {
         stallIf = true;
     }
+    nextIfid.pc = pc;
     pc += 4;
     nextIfid.instruction = instruction;
-    nextIfid.pc = pc;
     if (instruction == 0xfeedfeed) haltSeen = true;
 
     // instructionDecode
-    idex.instructionData.tag = getInstType(ifid.instruction);
+    nextIdex.instructionData.tag = getInstType(ifid.instruction);
     switch (nextIdex.instructionData.tag)
     {
     case R:
