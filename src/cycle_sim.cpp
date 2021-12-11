@@ -488,11 +488,20 @@ IFID ifid;
 IDEX idex;
 EXMEM exmem;
 MEMWB memwb;
+bool haltSeen;
 
 int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mainMem)
 {
-    // TODO: initialize icache, dcache
+    icache = Cache{};
+    dcache = Cache{};
+    pipeState = PipeState{};
+    pc = 0;
     memStore = mainMem;
+    ifid = IFID{};
+    idex = IDEX{};
+    exmem = EXMEM{};
+    memwb = MEMWB{};
+    haltSeen = false;
     return 0;
 }
 
@@ -669,7 +678,7 @@ CycleStatus runCycle()
     bool stallId = false;
 
     // instructionFetch
-    auto instruction = getCacheValue(&dcache, memStore, pipeState.cycle, pc, MemEntrySize::WORD_SIZE);
+    auto instruction = haltSeen ? 0 : getCacheValue(&dcache, memStore, pipeState.cycle, pc, MemEntrySize::WORD_SIZE);
     if (instruction == UINT64_MAX)
     {
         stallIf = true;
@@ -677,6 +686,7 @@ CycleStatus runCycle()
     pc += 4;
     nextIfid.instruction = instruction;
     nextIfid.pc = pc;
+    if (instruction == 0xfeedfeed) haltSeen = true;
 
     // instructionDecode
     idex.instructionData.tag = getInstType(ifid.instruction);
@@ -748,7 +758,7 @@ CycleStatus runCycle()
     //  (ID/EX.RegisterRt = IF/ID.RegisterRt)))
     // we need to wait for the memory fetch to succeed
     auto idexRt = idex.instructionData.rt();
-    if (idex.instructionData.isMemRead() && (idexRt == nextIdex.instructionData.rs() || idexRt == nextIdex.instructionData.rt()))
+    if (idex.instructionData.isMemRead() && idexRt != 0 && (idexRt == nextIdex.instructionData.rs() || idexRt == nextIdex.instructionData.rt()))
     {
         stallId = true;
     }
