@@ -730,92 +730,92 @@ void runCycle()
         case OP_J:
             pc = ((ifid.pc + 4) & 0xf0000000) | (jData.addr << 2);
             break;
-
         default:
         }
         nextIdex.instructionData.data.jData = jData;
         break;
     }
-        nextIdex.instruction = ifid.instruction;
-
-        // if (ID/EX.MemRead and
-        //  ((ID/EX.RegisterRt = IF/ID.RegisterRs) or
-        //  (ID/EX.RegisterRt = IF/ID.RegisterRt)))
-        // we need to wait for the memory fetch to succeed
-        auto idexRt = idex.instructionData.rt();
-        if (idex.instructionData.isMemRead() && (idexRt == nextIdex.instructionData.rs() || idexRt == nextIdex.instructionData.rt()))
-        {
-            stallId = true;
-        }
-
-        // execute
-
-        // forwarding of results from register data being written back
-        if (memwb.regWriteValue != UINT64_MAX && memwb.regToWrite != 0)
-        { // if (MEM/WB.RegWrite and (MEM/WB.RegisterRd ≠ 0)
-            if (memwb.regToWrite == idex.instructionData.rs())
-            { // (and MEM/WB.registerRd = ID/EX.registerRs)) ForwardA = 01
-                idex.instructionData.rsValue(memwb.regWriteValue);
-            }
-            if (memwb.regToWrite == memwb.instructionData.rt())
-            { // (and MEM/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
-                memwb.instructionData.rtValue(memwb.regWriteValue);
-            }
-        }
-
-        // forwarding of results from previous cycle's execute
-        if (exmem.regWriteValue != UINT64_MAX && exmem.regToWrite != 0)
-        { // if (EX/WB.RegWrite and (EX/WB.RegisterRd ≠ 0)
-            if (exmem.regToWrite == idex.instructionData.rs())
-            { // (and EX/WB.registerRd = ID/EX.registerRs)) ForwardA = 01
-                idex.instructionData.rsValue(exmem.regWriteValue);
-            }
-            if (exmem.regToWrite == exmem.instructionData.rt())
-            { // (and EX/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
-                exmem.instructionData.rtValue(exmem.regWriteValue);
-            }
-        }
-
-        switch (idex.instructionData.tag)
-        {
-        case R:
-            nextExmem.regWriteValue = handleRInstEx(idex.instructionData.data.rData);
-            nextMemwb.regToWrite = idex.instructionData.data.rData.rd;
-            break;
-        case I:
-            nextExmem.regWriteValue = handleImmInstEx(idex.instructionData.data.iData);
-            nextMemwb.regToWrite = idex.instructionData.data.iData.rt;
-            break;
-        case J:
-        {
-            handleJInstEx(idex.instructionData.data.jData);
-            break;
-        }
-        }
-        nextExmem.instruction = idex.instruction;
-        nextExmem.instructionData = idex.instructionData;
-
-        // mem
-        switch (exmem.instructionData.tag)
-        {
-        case I:
-            // TODO: handle stalls
-            handleMem(exmem.instructionData.data.iData);
-        }
-        nextMemwb = exmem;
-
-        // writeBack
-        if (memwb.regWriteValue != UINT64_MAX && memwb.regToWrite != 0)
-        {
-            regs[memwb.regToWrite] = memwb.regWriteValue;
-        }
-
-        // finish cycle
-        if (stallIf || stallId)
-            pc -= 4;
-        if (!stallId)
-            ifid = nextIfid;
-        idex = nextIdex;
-        exmem = nextExmem;
-        memwb = nextMemwb;
     }
+    nextIdex.instruction = ifid.instruction;
+
+    // if (ID/EX.MemRead and
+    //  ((ID/EX.RegisterRt = IF/ID.RegisterRs) or
+    //  (ID/EX.RegisterRt = IF/ID.RegisterRt)))
+    // we need to wait for the memory fetch to succeed
+    auto idexRt = idex.instructionData.rt();
+    if (idex.instructionData.isMemRead() && (idexRt == nextIdex.instructionData.rs() || idexRt == nextIdex.instructionData.rt()))
+    {
+        stallId = true;
+    }
+
+    // execute
+
+    // forwarding of results from register data being written back
+    if (memwb.regWriteValue != UINT64_MAX && memwb.regToWrite != 0)
+    { // if (MEM/WB.RegWrite and (MEM/WB.RegisterRd ≠ 0)
+        if (memwb.regToWrite == idex.instructionData.rs())
+        { // (and MEM/WB.registerRd = ID/EX.registerRs)) ForwardA = 01
+            idex.instructionData.rsValue(memwb.regWriteValue);
+        }
+        if (memwb.regToWrite == memwb.instructionData.rt())
+        { // (and MEM/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
+            memwb.instructionData.rtValue(memwb.regWriteValue);
+        }
+    }
+
+    // forwarding of results from previous cycle's execute
+    if (exmem.regWriteValue != UINT64_MAX && exmem.regToWrite != 0)
+    { // if (EX/WB.RegWrite and (EX/WB.RegisterRd ≠ 0)
+        if (exmem.regToWrite == idex.instructionData.rs())
+        { // (and EX/WB.registerRd = ID/EX.registerRs)) ForwardA = 01
+            idex.instructionData.rsValue(exmem.regWriteValue);
+        }
+        if (exmem.regToWrite == exmem.instructionData.rt())
+        { // (and EX/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
+            exmem.instructionData.rtValue(exmem.regWriteValue);
+        }
+    }
+
+    switch (idex.instructionData.tag)
+    {
+    case R:
+        nextExmem.regWriteValue = handleRInstEx(idex.instructionData.data.rData);
+        nextMemwb.regToWrite = idex.instructionData.data.rData.rd;
+        break;
+    case I:
+        nextExmem.regWriteValue = handleImmInstEx(idex.instructionData.data.iData);
+        nextMemwb.regToWrite = idex.instructionData.data.iData.rt;
+        break;
+    case J:
+    {
+        handleJInstEx(idex.instructionData.data.jData);
+        break;
+    }
+    }
+    nextExmem.instruction = idex.instruction;
+    nextExmem.instructionData = idex.instructionData;
+
+    // mem
+    switch (exmem.instructionData.tag)
+    {
+    case I:
+        // TODO: handle stalls
+        handleMem(exmem.instructionData.data.iData);
+    }
+    nextMemwb = exmem;
+
+    // writeBack
+    if (memwb.regWriteValue != UINT64_MAX && memwb.regToWrite != 0)
+    {
+        regs[memwb.regToWrite] = memwb.regWriteValue;
+    }
+
+    // finish cycle
+    if (stallIf || stallId)
+        pc -= 4;
+    if (!stallId)
+        ifid = nextIfid;
+    idex = nextIdex;
+    exmem = nextExmem;
+    memwb = nextMemwb;
+}
