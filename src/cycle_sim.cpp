@@ -140,7 +140,6 @@ static uint32_t regs[NUM_REGS];
 //     return 0;
 // }
 
-
 void fillRegisterState(RegisterInfo &reg)
 {
     reg.at = regs[REG_AT];
@@ -221,15 +220,18 @@ struct JData
 
 struct InstructionData
 {
-    union {
+    union
+    {
         RData rData;
         IData iData;
         JData jData;
     } data;
     INST_TYPE tag;
 
-    uint8_t rs() {
-        switch (this->tag) {
+    uint8_t rs()
+    {
+        switch (this->tag)
+        {
         case R:
             return this->data.rData.rs;
         case I:
@@ -239,8 +241,10 @@ struct InstructionData
         }
     }
 
-    uint8_t rt() {
-        switch (this->tag) {
+    uint8_t rt()
+    {
+        switch (this->tag)
+        {
         case R:
             return this->data.rData.rt;
         case I:
@@ -250,8 +254,10 @@ struct InstructionData
         }
     }
 
-    void rsValue(uint64_t val) {
-        switch (this->tag) {
+    void rsValue(uint64_t val)
+    {
+        switch (this->tag)
+        {
         case R:
             this->data.rData.rsValue = val;
             break;
@@ -263,8 +269,10 @@ struct InstructionData
         }
     }
 
-    void rtValue(uint64_t val) {
-        switch (this->tag) {
+    void rtValue(uint64_t val)
+    {
+        switch (this->tag)
+        {
         case R:
             this->data.rData.rtValue = val;
             break;
@@ -276,9 +284,12 @@ struct InstructionData
         }
     }
 
-    bool isMemRead() {
-        if (this->tag == I) {
-            switch (this->data.iData.opcode) {
+    bool isMemRead()
+    {
+        if (this->tag == I)
+        {
+            switch (this->data.iData.opcode)
+            {
             case OP_LBU:
             case OP_LHU:
             case OP_LW:
@@ -343,8 +354,8 @@ uint64_t getCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t 
     }
 }
 
-// returns true if value ready, false otherwise 
-bool setCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t addr, MemEntrySize size, uint32_t value) 
+// returns true if value ready, false otherwise
+bool setCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t addr, MemEntrySize size, uint32_t value)
 {
     int ret;
     switch (size)
@@ -362,7 +373,8 @@ bool setCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t addr
         cerr << "Unknown mem write word size provided.\n";
         exit(1);
     }
-    if (ret) {
+    if (ret)
+    {
         cerr << "Failed to write to memory address 0x" << std::hex << std::setw(8) << std::setfill('0') << addr << endl;
     }
     return true;
@@ -461,7 +473,7 @@ struct JData getJData(uint32_t instr, uint32_t pc)
     struct JData jData = {
         getOpcode(instr),  // uint8_t opcode;
         instr & 0x3ffffff, // uint32_t addr;
-        pc            // uint32_t oldPC;
+        pc                 // uint32_t oldPC;
     };
 
     return jData;
@@ -578,7 +590,7 @@ uint64_t handleImmInstEx(IData &iData)
 
 void handleJInstEx(JData &jData)
 {
-    // TODO: is this needed? what to do for jal 
+    // TODO: is this needed? what to do for jal
     return;
 }
 
@@ -587,42 +599,54 @@ int handleMem(IData &iData)
 {
     uint32_t addr = iData.rsValue + iData.seImm;
     uint32_t data = 0;
-    // TODO: perform operations through cache 
+    // TODO: perform operations through cache
     // and overall clean this up
     switch (iData.opcode)
     {
     case OP_SB:
-        if (setCacheValue(&dcache, memStore, pipeState.cycle, addr, BYTE_SIZE, iData.rtValue)) {
+        if (setCacheValue(&dcache, memStore, pipeState.cycle, addr, BYTE_SIZE, iData.rtValue))
+        {
             // TODO: stall
         }
         break;
     case OP_SH:
-        if (setCacheValue(&dcache, memStore, pipeState.cycle, addr, HALF_SIZE, iData.rtValue)) {
+        if (setCacheValue(&dcache, memStore, pipeState.cycle, addr, HALF_SIZE, iData.rtValue))
+        {
             // TODO: stall
         }
         break;
     case OP_SW:
-        if (setCacheValue(&dcache, memStore, pipeState.cycle, addr, WORD_SIZE, iData.rtValue)) {
+        if (setCacheValue(&dcache, memStore, pipeState.cycle, addr, WORD_SIZE, iData.rtValue))
+        {
             // TODO: stall
         }
         break;
-     case OP_LBU:
+    case OP_LBU:
         data = getCacheValue(&dcache, memStore, pipeState.cycle, addr, BYTE_SIZE);
-        if (data == UINT64_MAX) {
+        if (data == UINT64_MAX)
+        {
             // TODO stall
-        } else iData.rtValue = data;
+        }
+        else
+            iData.rtValue = data;
         break;
     case OP_LHU:
         data = getCacheValue(&dcache, memStore, pipeState.cycle, addr, HALF_SIZE);
-        if (data == UINT64_MAX) {
+        if (data == UINT64_MAX)
+        {
             // TODO stall
-        } else iData.rtValue = data;
+        }
+        else
+            iData.rtValue = data;
         break;
     case OP_LW:
         data = getCacheValue(&dcache, memStore, pipeState.cycle, addr, WORD_SIZE);
-        if (data == UINT64_MAX) {
+        if (data == UINT64_MAX)
+        {
             // TODO stall
-        } else iData.rtValue = data;
+        }
+        else
+            iData.rtValue = data;
         break;
     }
     return 0;
@@ -712,76 +736,86 @@ void runCycle()
         nextIdex.instructionData.data.jData = jData;
         break;
     }
-    }
-    nextIdex.instruction = ifid.instruction;
+        nextIdex.instruction = ifid.instruction;
 
-    // if (ID/EX.MemRead and
-    //  ((ID/EX.RegisterRt = IF/ID.RegisterRs) or
-    //  (ID/EX.RegisterRt = IF/ID.RegisterRt)))
-    // we need to wait for the memory fetch to succeed
-    auto idexRt = idex.instructionData.rt();
-    if (idex.instructionData.isMemRead() && (idexRt == nextIdex.instructionData.rs() || idexRt == nextIdex.instructionData.rt())) {
-        stallId = true;
-    }
-
-    // execute
-
-    // forwarding of results from register data being written back
-    if (memwb.regWriteValue != UINT64_MAX && memwb.regToWrite != 0) {   // if (MEM/WB.RegWrite and (MEM/WB.RegisterRd ≠ 0)
-        if (memwb.regToWrite == idex.instructionData.rs()) {            // (and MEM/WB.registerRd = ID/EX.registerRs)) ForwardA = 01
-            idex.instructionData.rsValue(memwb.regWriteValue);
+        // if (ID/EX.MemRead and
+        //  ((ID/EX.RegisterRt = IF/ID.RegisterRs) or
+        //  (ID/EX.RegisterRt = IF/ID.RegisterRt)))
+        // we need to wait for the memory fetch to succeed
+        auto idexRt = idex.instructionData.rt();
+        if (idex.instructionData.isMemRead() && (idexRt == nextIdex.instructionData.rs() || idexRt == nextIdex.instructionData.rt()))
+        {
+            stallId = true;
         }
-        if (memwb.regToWrite == memwb.instructionData.rt()) {           // (and MEM/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
-            memwb.instructionData.rtValue(memwb.regWriteValue);
-        }
-    }
 
-    // forwarding of results from previous cycle's execute
-    if (exmem.regWriteValue != UINT64_MAX && exmem.regToWrite != 0) {   // if (EX/WB.RegWrite and (EX/WB.RegisterRd ≠ 0)
-        if (exmem.regToWrite == idex.instructionData.rs()) {            // (and EX/WB.registerRd = ID/EX.registerRs)) ForwardA = 01
-            idex.instructionData.rsValue(exmem.regWriteValue);
-        }
-        if (exmem.regToWrite == exmem.instructionData.rt()) {           // (and EX/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
-            exmem.instructionData.rtValue(exmem.regWriteValue);
-        }
-    }
+        // execute
 
-    switch (idex.instructionData.tag)
-    {
-    case R:
-        nextExmem.regWriteValue = handleRInstEx(idex.instructionData.data.rData);
-        nextMemwb.regToWrite = idex.instructionData.data.rData.rd;
-        break;
-    case I:
-        nextExmem.regWriteValue = handleImmInstEx(idex.instructionData.data.iData);
-        nextMemwb.regToWrite = idex.instructionData.data.iData.rt;
-        break;
-    case J:
-    {
-        handleJInstEx(idex.instructionData.data.jData);
-        break;
-    }
-    }
-    nextExmem.instruction = idex.instruction;
-    nextExmem.instructionData = idex.instructionData;
+        // forwarding of results from register data being written back
+        if (memwb.regWriteValue != UINT64_MAX && memwb.regToWrite != 0)
+        { // if (MEM/WB.RegWrite and (MEM/WB.RegisterRd ≠ 0)
+            if (memwb.regToWrite == idex.instructionData.rs())
+            { // (and MEM/WB.registerRd = ID/EX.registerRs)) ForwardA = 01
+                idex.instructionData.rsValue(memwb.regWriteValue);
+            }
+            if (memwb.regToWrite == memwb.instructionData.rt())
+            { // (and MEM/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
+                memwb.instructionData.rtValue(memwb.regWriteValue);
+            }
+        }
 
-    // mem
-    switch (exmem.instructionData.tag) {
+        // forwarding of results from previous cycle's execute
+        if (exmem.regWriteValue != UINT64_MAX && exmem.regToWrite != 0)
+        { // if (EX/WB.RegWrite and (EX/WB.RegisterRd ≠ 0)
+            if (exmem.regToWrite == idex.instructionData.rs())
+            { // (and EX/WB.registerRd = ID/EX.registerRs)) ForwardA = 01
+                idex.instructionData.rsValue(exmem.regWriteValue);
+            }
+            if (exmem.regToWrite == exmem.instructionData.rt())
+            { // (and EX/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
+                exmem.instructionData.rtValue(exmem.regWriteValue);
+            }
+        }
+
+        switch (idex.instructionData.tag)
+        {
+        case R:
+            nextExmem.regWriteValue = handleRInstEx(idex.instructionData.data.rData);
+            nextMemwb.regToWrite = idex.instructionData.data.rData.rd;
+            break;
+        case I:
+            nextExmem.regWriteValue = handleImmInstEx(idex.instructionData.data.iData);
+            nextMemwb.regToWrite = idex.instructionData.data.iData.rt;
+            break;
+        case J:
+        {
+            handleJInstEx(idex.instructionData.data.jData);
+            break;
+        }
+        }
+        nextExmem.instruction = idex.instruction;
+        nextExmem.instructionData = idex.instructionData;
+
+        // mem
+        switch (exmem.instructionData.tag)
+        {
         case I:
             // TODO: handle stalls
             handleMem(exmem.instructionData.data.iData);
-    }
-    nextMemwb = exmem;
+        }
+        nextMemwb = exmem;
 
-    // writeBack
-    if (memwb.regWriteValue != UINT64_MAX && memwb.regToWrite != 0) {
-        regs[memwb.regToWrite] = memwb.regWriteValue;
+        // writeBack
+        if (memwb.regWriteValue != UINT64_MAX && memwb.regToWrite != 0)
+        {
+            regs[memwb.regToWrite] = memwb.regWriteValue;
+        }
+
+        // finish cycle
+        if (stallIf || stallId)
+            pc -= 4;
+        if (!stallId)
+            ifid = nextIfid;
+        idex = nextIdex;
+        exmem = nextExmem;
+        memwb = nextMemwb;
     }
-    
-    // finish cycle
-    if (stallIf || stallId) pc -= 4;
-    if (!stallId) ifid = nextIfid;
-    idex = nextIdex;
-    exmem = nextExmem;
-    memwb = nextMemwb;
-}
