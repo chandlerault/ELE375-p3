@@ -835,10 +835,8 @@ CycleStatus runCycle()
     } else {
         ifid = nextIfid;
     }
-        
-    if (!stallId) {
-        idex = nextIdex;
-    }
+    
+    idex = nextIdex;
 
     exmem = nextExmem;
     memwb = nextMemwb;
