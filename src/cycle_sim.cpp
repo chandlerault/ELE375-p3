@@ -546,9 +546,9 @@ uint64_t handleRInstEx(RData &rData)
         rdValue = rData.rsValue = rData.rtValue;
         break;
     default:
-        cerr << "Illegal instruction at address "
+        cerr << "Illegal function code at address "
              << "0x" << hex
-             << setfill('0') << setw(8) << pc << endl;
+             << setfill('0') << setw(8) << pc - 4 << ": " << (uint16_t)rData.funct << endl;
         exit(1);
         break;
     }
@@ -593,7 +593,6 @@ uint64_t handleImmInstEx(IData &iData)
         // stores happen in mem stage
         break;
     }
-
     return rtValue;
 }
 
