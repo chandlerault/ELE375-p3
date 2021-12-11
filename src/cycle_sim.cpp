@@ -6,7 +6,6 @@
 #include "MemoryStore.h"
 #include "RegisterInfo.h"
 #include "EndianHelpers.h"
-#include "CacheConfig.h"
 #include "DriverFunctions.h"
 
 #define EXCEPTION_ADDR 0x8000
@@ -236,9 +235,10 @@ struct InstructionData
             return this->data.rData.rs;
         case I:
             return this->data.iData.rs;
-        case J:
+        default:
             return 0;
         }
+        
     }
 
     uint8_t rt() {
@@ -247,9 +247,8 @@ struct InstructionData
             return this->data.rData.rt;
         case I:
             return this->data.iData.rt;
-        case J:
+        default:
             return 0;
-        }
     }
 
     void rsValue(uint64_t val) {
@@ -410,6 +409,9 @@ enum INST_TYPE getInstType(uint32_t instr)
         return J;
         break;
     }
+    // TODO: notify caller somehow, for illegal arg exception
+    std::cerr << "Unknown exception encountered" << endl;
+    exit(1);
 }
 
 // Arg: current instruction
@@ -424,9 +426,9 @@ struct RData getRData(uint32_t instr)
         regs[rt],         // uint32_t rtValue;
         rs,
         rt,
-        (instr >> 11) & 0x1f, // uint8_t rd
-        (instr >> 6) & 0x1f,  // uint8_t shamt
-        instr & 0x3f          // uint8_tfunct
+        (uint8_t)(instr >> 11) & 0x1f, // uint8_t rd
+        (uint8_t)(instr >> 6) & 0x1f,  // uint8_t shamt
+        (uint8_t)instr & 0x3f          // uint8_tfunct
     };
 
     return rData;
@@ -455,12 +457,12 @@ struct IData getIData(uint32_t instr)
 
 // Arg: current instruction
 // Return: struct JData holding relevant jump instruction data
-struct JData getJData(uint32_t instr)
+struct JData getJData(uint32_t instr, uint32_t pc)
 {
     struct JData jData = {
         getOpcode(instr),  // uint8_t opcode;
         instr & 0x3ffffff, // uint32_t addr;
-        ifid.pc            // uint32_t oldPC;
+        pc            // uint32_t oldPC;
     };
 
     return jData;
@@ -480,6 +482,7 @@ int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mai
 {
     // TODO: initialize icache, dcache
     memStore = mainMem;
+    return 0;
 }
 
 // returns new value of rd, or UINT64_MAX if none
@@ -574,12 +577,13 @@ uint64_t handleImmInstEx(IData &iData)
     return rtValue;
 }
 
-int handleJInstEx(JData &jData)
+void handleJInstEx(JData &jData)
 {
     // TODO: is this needed? what to do for jal 
+    return;
 }
 
-// returns non zero on mem failure
+// returns non zero when stall
 int handleMem(IData &iData)
 {
     uint32_t addr = iData.rsValue + iData.seImm;
@@ -621,9 +625,8 @@ int handleMem(IData &iData)
             // TODO stall
         } else iData.rtValue = data;
         break;
-    default:
-        return 0;
     }
+    return 0;
 }
 
 void runCycle()
@@ -689,13 +692,12 @@ void runCycle()
             }
             break;
         default:
-        }
-        nextIdex.instructionData.data.iData = iData;
-        break;
+            nextIdex.instructionData.data.iData = iData;
+            break;
     }
     case J:
     {
-        auto jData = getJData(ifid.instruction);
+        auto jData = getJData(ifid.instruction, ifid.pc);
         switch (jData.opcode)
         {
         case OP_JAL:
