@@ -390,6 +390,7 @@ uint8_t getOpcode(uint32_t instr)
 // Return: enum INST_TYPE tag associated with instruction being executed
 enum INST_TYPE getInstType(uint32_t instr)
 {
+    if (instr == 0xfeedfeed) return R;
     uint8_t opcode = getOpcode(instr);
     switch (opcode)
     {
@@ -429,6 +430,7 @@ enum INST_TYPE getInstType(uint32_t instr)
 // Return: struct RData holding relevant register instruction data
 struct RData getRData(uint32_t instr)
 {
+    if (instr == 0xfeedfeed) return RData{};
     uint8_t rs = (instr >> 21) & 0x1f;
     uint8_t rt = (instr >> 16) & 0x1f;
     struct RData rData = {
