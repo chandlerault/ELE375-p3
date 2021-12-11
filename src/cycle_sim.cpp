@@ -730,7 +730,6 @@ void runCycle()
         case OP_J:
             pc = ((ifid.pc + 4) & 0xf0000000) | (jData.addr << 2);
             break;
-        default:
         }
         nextIdex.instructionData.data.jData = jData;
         break;
