@@ -652,8 +652,14 @@ int handleMem(IData &iData)
     return 0;
 }
 
-void runCycle()
+enum CycleStatus {
+    NOT_HALTED,
+    HALTED
+};
+
+CycleStatus runCycle()
 {
+    CycleStatus cycleStatus{};
     IFID nextIfid;
     IDEX nextIdex;
     EXMEM nextExmem;
@@ -809,6 +815,8 @@ void runCycle()
         regs[memwb.regToWrite] = memwb.regWriteValue;
     }
 
+    if (memwb.instruction == 0xfeedfeed) cycleStatus = HALTED;
+
     // finish cycle
     if (stallIf || stallId)
         pc -= 4;
@@ -817,4 +825,26 @@ void runCycle()
     idex = nextIdex;
     exmem = nextExmem;
     memwb = nextMemwb;
+
+    return cycleStatus;
 }
+
+int runCycles(unsigned int cycles) {
+    CycleStatus cycleStatus{};
+    for(; cycles > 0 && cycleStatus != HALTED; cycles--) {
+        cycleStatus = runCycle();
+    }
+    dumpPipeState(pipeState);
+    return cycleStatus == HALTED;
+}
+int runTillHalt() {
+    CycleStatus cycleStatus{};
+    do {
+        cycleStatus = runCycle();
+    } while(cycleStatus != HALTED);
+    dumpPipeState(pipeState);
+    return 0;
+}          
+int finalizeSimulator() {
+    return 0;
+}  
