@@ -851,8 +851,6 @@ CycleStatus runCycle()
     exmem = nextExmem;
     memwb = nextMemwb;
 
-   
-
     return cycleStatus;
 }
 
@@ -873,5 +871,13 @@ int runTillHalt() {
     return 0;
 }          
 int finalizeSimulator() {
+    //Set the register values in the struct for printing...
+    RegisterInfo reg;
+    memset(&reg, 0, sizeof(RegisterInfo));
+    fillRegisterState(reg);
+
+    dumpRegisterState(reg);
+    dumpMemoryState(memStore);
+
     return 0;
 }  
