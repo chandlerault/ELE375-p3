@@ -310,15 +310,11 @@ struct IDEX
 {
     uint32_t instruction;
     InstructionData instructionData;
-};
-
-struct EXMEM
-{
-    uint32_t instruction;
-    InstructionData instructionData;
     uint64_t regWriteValue = UINT64_MAX;
     uint8_t regToWrite;
 };
+
+using EXMEM = IDEX;
 
 using MEMWB = EXMEM;
 
@@ -662,6 +658,29 @@ int handleMem(IData &iData)
     return 0;
 }
 
+bool branchNeedsStall(InstructionData &currentInstr, IDEX &nextInstr, bool checkRt) {
+    // TODO: check for mem op
+    
+    if (currentInstr.rs() == nextInstr.regToWrite && nextInstr.regToWrite != 0) {
+        return true;
+    }
+
+    if (checkRt && currentInstr.rt() == nextInstr.regToWrite && nextInstr.regToWrite != 0) {
+        return true;
+    }
+
+    return false;
+}
+
+void handleBranchForwarding(IData &iData, EXMEM &exmem) {
+    if (iData.rs == exmem.regToWrite && exmem.regToWrite != 0) {
+        iData.rsValue = exmem.regWriteValue;
+    }
+    else if (iData.rt == exmem.regToWrite && exmem.regToWrite != 0) {
+        iData.rtValue = exmem.regWriteValue;
+    }
+}
+
 enum CycleStatus {
     NOT_HALTED,
     HALTED
@@ -696,45 +715,57 @@ CycleStatus runCycle()
     case R:
     {
         nextIdex.instructionData.data.rData = getRData(ifid.instruction);
+        if (nextIdex.instructionData.data.rData.funct == FUN_JR) {
+            nextIdex.regToWrite = 31;
+        } else nextIdex.regToWrite = nextIdex.instructionData.data.rData.rd;
         break;
     }
     case I:
     {
         auto iData = getIData(ifid.instruction);
+        nextIdex.instructionData.data.iData = iData;
         switch (iData.opcode)
         {
         case OP_BEQ:
+            handleBranchForwarding(iData, exmem);
             if (iData.rsValue == iData.rtValue)
             {
                 nextPc = ifid.pc + 4 +((static_cast<int32_t>(iData.seImm)) << 2);
                 break;
             }
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, true);
             break;
         case OP_BNE:
+            handleBranchForwarding(iData, exmem);
             if (iData.rsValue != iData.rtValue)
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
                 break;
             }
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, true);
             break;
         case OP_BGTZ:
+            handleBranchForwarding(iData, exmem);
             if (iData.rsValue > 0)
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
                 break;
             }
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
             break;
         case OP_BLEZ:
+            handleBranchForwarding(iData, exmem);
             if (iData.rsValue <= 0)
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
                 break;
             }
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
             break;
         default:
+            nextIdex.regToWrite = iData.rt;
             break;
         }
-        nextIdex.instructionData.data.iData = iData;
         break;
     }
     case J:
