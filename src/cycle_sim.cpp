@@ -580,9 +580,6 @@ uint64_t handleRInstEx(RData &rData)
         rdValue = rData.rsValue & rData.rtValue;
         break;
     case FUN_JR:
-        // progCounter = regs[rs];
-        // ret = NOINC_PC;
-        // TODO!!
         break;
     case FUN_NOR:
         rdValue = ~(rData.rsValue | rData.rtValue);
@@ -739,10 +736,10 @@ bool branchNeedsStall(InstructionData &currentInstr, IDEX &nextInstr, bool check
 }
 
 void handleBranchForwarding(InstructionData &instr, EXMEM &exmem) {
-    if (instr.rs() == exmem.regToWrite && exmem.regToWrite != 0) {
+    if (instr.rs() == exmem.regToWrite && exmem.regToWrite != 0 && exmem.regWriteValue != UINT64_MAX) {
         instr.rsValue(exmem.regWriteValue);
     }
-    else if (instr.rt() == exmem.regToWrite && exmem.regToWrite != 0) {
+    else if (instr.rt() == exmem.regToWrite && exmem.regToWrite != 0 && exmem.regWriteValue != UINT64_MAX) {
         instr.rtValue(exmem.regWriteValue);
     }
 }
