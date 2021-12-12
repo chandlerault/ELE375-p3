@@ -320,6 +320,7 @@ using MEMWB = EXMEM;
 
 struct Cache
 {
+    // type = ICACHE
 };
 
 // returns UINT64_MAX if result is not available in the cache yet, the value at the address otherwise
@@ -327,6 +328,13 @@ uint64_t getCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t 
 {
     uint32_t value = 0;
     int ret = mem->getMemValue(addr, value, size);
+
+    // cache miss logic
+    // if (value == UINT64_MAX && cache.type == ICACHE) simStats.icHits++;
+    // if (value == UINT64_MAX && cache.type == DCACHE) simStats.dcHits++;
+
+    
+
     if (ret)
     {
         cout << "Could not get mem value" << endl;
@@ -508,6 +516,7 @@ int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mai
     memwb = MEMWB{};
     haltSeen = false;
     cycleStatus = CycleStatus{};
+    simStats = SimulationStats{};
     return 0;
 }
 
@@ -648,6 +657,7 @@ int handleMem(IData &iData)
         data = getCacheValue(&dcache, memStore, pipeState.cycle, addr, HALF_SIZE);
         if (data == UINT64_MAX)
         {
+
             // TODO stall
         }
         else
@@ -829,7 +839,7 @@ CycleStatus runCycle()
         { // (and EX/WB.registerRd = ID/EX.registerRs)) ForwardA = 01
             idex.instructionData.rsValue(exmem.regWriteValue);
         }
-        if (exmem.regToWrite == exmem.instructionData.rt())
+        if (exmem.regToWrite == idex.instructionData.rt())
         { // (and EX/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
             idex.instructionData.rtValue(exmem.regWriteValue);
         }
@@ -875,6 +885,10 @@ CycleStatus runCycle()
     pipeState.exInstr = nextExmem.instruction;
     pipeState.memInstr = nextMemwb.instruction;
     pipeState.wbInstr = memwb.instruction;
+
+    // update total cycles
+    simStats.totalCycles++;
+
 
     // finish cycle
     if (!stallIf && !stallId) {
