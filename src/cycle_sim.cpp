@@ -943,8 +943,6 @@ CycleStatus runCycle()
     case J:
     {
         handleJInstEx(idex.instructionData.data.jData);
-        nextExmem.regWriteValue = UINT64_MAX;
-        nextExmem.regToWrite = 0;
         break;
     }
     }
