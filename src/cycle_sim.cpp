@@ -477,6 +477,11 @@ struct JData getJData(uint32_t instr, uint32_t pc)
     return jData;
 }
 
+enum CycleStatus {
+    NOT_HALTED,
+    HALTED
+};
+
 Cache icache;
 Cache dcache;
 PipeState pipeState;
@@ -682,11 +687,6 @@ void handleBranchForwarding(IData &iData, EXMEM &exmem) {
         iData.rtValue = exmem.regWriteValue;
     }
 }
-
-enum CycleStatus {
-    NOT_HALTED,
-    HALTED
-};
 
 CycleStatus runCycle()
 {
