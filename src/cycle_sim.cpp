@@ -493,6 +493,7 @@ EXMEM exmem;
 MEMWB memwb;
 bool haltSeen;
 CycleStatus cycleStatus{};
+SimulationStats simStats{};
 
 int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mainMem)
 {
@@ -698,6 +699,14 @@ CycleStatus runCycle()
     bool stallIf = false;
     bool stallId = false;
 
+    // writeBack
+    // first as we're emulating writing to register file 
+    // happening before reading to it 
+    if (memwb.regWriteValue != UINT64_MAX && memwb.regToWrite != 0)
+    {
+        regs[memwb.regToWrite] = memwb.regWriteValue;
+    }
+
     // instructionFetch
     auto instruction = haltSeen ? 0 : getCacheValue(&icache, memStore, pipeState.cycle, pc, MemEntrySize::WORD_SIZE);
     if (instruction == UINT64_MAX)
@@ -855,12 +864,8 @@ CycleStatus runCycle()
 
     nextMemwb = exmem;
 
-    // writeBack
-    if (memwb.regWriteValue != UINT64_MAX && memwb.regToWrite != 0)
-    {
-        regs[memwb.regToWrite] = memwb.regWriteValue;
-    }
-
+    
+    // writeback trigger halt
     if (memwb.instruction == 0xfeedfeed) cycleStatus = HALTED;
 
      // update pipe state information
