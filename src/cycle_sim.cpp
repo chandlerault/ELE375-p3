@@ -377,22 +377,42 @@ bool setCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t addr
     {
     case BYTE_SIZE:
         ret = mem->setMemValue(addr, value & 0xFF, BYTE_SIZE);
-        /*// cache miss and hit logic for loads
+        /*// cache miss and hit logic for store
         if (cache.type == ICACHE){
             if (ret) simStats.icHits++;
             else simStats.icMisses++;
         } 
         else {
-            if (ret) simStats.dcMisses++;
-            else simStats.dcHits++;
+            if (ret) simStats.dcHits++;
+            else simStats.dcMisses++;
         }
         */
         break;
     case HALF_SIZE:
         ret = mem->setMemValue(addr, value & 0xFFFF, HALF_SIZE);
+        /*// cache miss and hit logic for store
+        if (cache.type == ICACHE){
+            if (ret) simStats.icHits++;
+            else simStats.icMisses++;
+        } 
+        else {
+            if (ret) simStats.dcHits++;
+            else simStats.dcMisses++;
+        }
+        */
         break;
     case WORD_SIZE:
         ret = mem->setMemValue(addr, value, WORD_SIZE);
+        /*// cache miss and hit logic for store
+        if (cache.type == ICACHE){
+            if (ret) simStats.icHits++;
+            else simStats.icMisses++;
+        } 
+        else {
+            if (ret) simStats.dcHits++;
+            else simStats.dcMisses++;
+        }
+        */
         break;
     default:
         cerr << "Unknown mem write word size provided.\n";
@@ -891,7 +911,7 @@ CycleStatus runCycle()
     // mem
     if (exmem.instructionData.tag == I) {
         // TODO: handle stalls
-        handleMem(exmem.instructionData.data.iData);
+        handleMem(exmem);
     }
 
     nextMemwb = exmem;
