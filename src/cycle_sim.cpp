@@ -320,7 +320,7 @@ using MEMWB = EXMEM;
 
 struct Cache
 {
-    // type = ICACHE
+    // type = 
 };
 
 // returns UINT64_MAX if result is not available in the cache yet, the value at the address otherwise
@@ -330,8 +330,8 @@ uint64_t getCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t 
     int ret = mem->getMemValue(addr, value, size);
 
     // cache miss logic
-    // if (value == UINT64_MAX && cache.type == ICACHE) simStats.icHits++;
-    // if (value == UINT64_MAX && cache.type == DCACHE) simStats.dcHits++;
+    // if (value == UINT64_MAX && cache.type == ICACHE) simStats.icMisses++;
+    // if (value == UINT64_MAX && cache.type == DCACHE) simStats.dcMisses++;
 
     
 
@@ -826,7 +826,7 @@ CycleStatus runCycle()
         { // (and MEM/WB.registerRd = ID/EX.registerRs)) ForwardA = 01
             idex.instructionData.rsValue(memwb.regWriteValue);
         }
-        if (memwb.regToWrite == memwb.instructionData.rt())
+        if (memwb.regToWrite == idex.instructionData.rt())
         { // (and MEM/WB.registerRd = ID/EX.registerRt)) ForwardB = 01
             idex.instructionData.rtValue(memwb.regWriteValue);
         }
