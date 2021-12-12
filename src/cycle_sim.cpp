@@ -827,7 +827,6 @@ CycleStatus runCycle()
             if (iData.rsValue == iData.rtValue)
             {
                 nextPc = ifid.pc + 4 +((static_cast<int32_t>(iData.seImm)) << 2);
-                break;
             }
             stallId = branchNeedsStall(nextIdex.instructionData, idex, true);
             break;
@@ -836,7 +835,6 @@ CycleStatus runCycle()
             if (iData.rsValue != iData.rtValue)
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
-                break;
             }
             stallId = branchNeedsStall(nextIdex.instructionData, idex, true);
             break;
@@ -845,7 +843,6 @@ CycleStatus runCycle()
             if (iData.rsValue > 0)
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
-                break;
             }
             stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
             break;
@@ -854,7 +851,6 @@ CycleStatus runCycle()
             if (iData.rsValue <= 0)
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
-                break;
             }
             stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
             break;
@@ -975,6 +971,7 @@ CycleStatus runCycle()
         pc = nextPc;
     }
     
+    // if stalling id stage, enter bubble to execute next
     idex = stallId ? IDEX{} : nextIdex;
 
     exmem = nextExmem;
