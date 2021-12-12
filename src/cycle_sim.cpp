@@ -805,7 +805,7 @@ CycleStatus runCycle()
     {
     case R:
     {
-        auto rData = getRData(ifid.instruction);
+        nextIdex.instructionData.data.rData = getRData(ifid.instruction);
         /* // Illegal instruction exception check
         if (checkFunction(nextIdex.instructionData.data.rData.funct)){
             // todo should this be nextPc
@@ -814,13 +814,12 @@ CycleStatus runCycle()
             break;
         }
         */
-       nextIdex.instructionData.data.rData = rData;
-        if (rData.funct == FUN_JR) {
+        if (nextIdex.instructionData.data.rData.funct == FUN_JR) {
             handleBranchForwarding(nextIdex.instructionData, exmem);
-            nextPc = rData.rsValue;
+            nextPc = nextIdex.instructionData.data.rData.rsValue;
             stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
         } else {
-            nextIdex.regToWrite = rData.rd;
+            nextIdex.regToWrite = nextIdex.instructionData.data.rData.rd;
         }
         break;
     }
