@@ -466,9 +466,10 @@ enum INST_TYPE getInstType(uint32_t instr)
     case OP_JAL:
         return J;
         break;
+    //default:
+    // return E;
     }
     // TODO: notify caller somehow, for illegal arg exception
-    // return E;
     std::cerr << "Unknown exception encountered" << endl;
     exit(1);
 }
@@ -488,7 +489,7 @@ struct RData getRData(uint32_t instr)
         rt,
         (uint8_t)((instr >> 11) & 0x1f), // uint8_t rd
         (uint8_t)((instr >> 6) & 0x1f),  // uint8_t shamt
-        (uint8_t)(instr & 0x3f)          // uint8_tfunct
+        (uint8_t)(instr & 0x3f)          // uint8_t funct
     };
 
     return rData;
@@ -743,6 +744,29 @@ void handleBranchForwarding(IData &iData, EXMEM &exmem) {
         iData.rtValue = exmem.regWriteValue;
     }
 }
+/*
+int checkFunction(uint8_t funct){
+    switch (funct)
+    {
+    case FUN_ADD:
+    case FUN_ADDU:
+    case FUN_AND:
+    case FUN_JR:
+    case FUN_NOR:
+    case FUN_OR:
+    case FUN_SLT:
+    case FUN_SLTU:
+    case FUN_SLL:
+    case FUN_SRL:
+    case FUN_SUB:
+    case FUN_SUBU:
+        return 0;
+    default:
+        return 1;
+    }
+}
+*/
+
 
 CycleStatus runCycle()
 {
@@ -780,9 +804,16 @@ CycleStatus runCycle()
     case R:
     {
         nextIdex.instructionData.data.rData = getRData(ifid.instruction);
-        if (nextIdex.instructionData.data.rData.funct == FUN_JR) {
-            nextIdex.regToWrite = 31;
-        } else nextIdex.regToWrite = nextIdex.instructionData.data.rData.rd;
+        /* // Illegal instruction exception check
+        if (checkFunction(nextIdex.instructionData.data.rData.funct)){
+            // todo should this be nextPc
+            pc = EXCEPTION_ADDR;
+            nextIfid.instruction = 0;
+        }
+        */
+        if (nextIdex.instructionData.data.rData.funct != FUN_JR) {
+            nextIdex.regToWrite = nextIdex.instructionData.data.rData.rd;
+        }
         break;
     }
     case I:
@@ -840,6 +871,8 @@ CycleStatus runCycle()
         {
         case OP_JAL:
             // TODO: what to do, WB is weird
+            nextIdex.regToWrite = 31;
+            // fallthrough
         case OP_J:
             nextPc = ((ifid.pc + 4) & 0xf0000000) | (jData.addr << 2);
             break;
@@ -893,19 +926,15 @@ CycleStatus runCycle()
         }
     }
 
+    nextExmem = idex;
+
     switch (idex.instructionData.tag)
     {
     case R:
         nextExmem.regWriteValue = handleRInstEx(idex.instructionData.data.rData);
-        /*// illegal instruction exception
-        if (nextExmem.regWriteValue == UINT64_MAX) break;
-        
-        */
-        nextExmem.regToWrite = idex.instructionData.data.rData.rd;
         break;
     case I:
         nextExmem.regWriteValue = handleImmInstEx(idex.instructionData.data.iData);
-        nextExmem.regToWrite = idex.instructionData.data.iData.rt;
         break;
     case J:
     {
@@ -915,8 +944,6 @@ CycleStatus runCycle()
         break;
     }
     }
-    nextExmem.instruction = idex.instruction;
-    nextExmem.instructionData = idex.instructionData;
 
     // mem
     if (exmem.instructionData.tag == I) {
