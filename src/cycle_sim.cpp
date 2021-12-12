@@ -192,7 +192,8 @@ enum INST_TYPE
 {
     R,
     I,
-    J
+    J //,
+    //E // for illegal excepetion
 };
 
 struct RData
@@ -467,6 +468,7 @@ enum INST_TYPE getInstType(uint32_t instr)
         break;
     }
     // TODO: notify caller somehow, for illegal arg exception
+    // return E;
     std::cerr << "Unknown exception encountered" << endl;
     exit(1);
 }
@@ -602,6 +604,7 @@ uint64_t handleRInstEx(RData &rData)
         rdValue = rData.rsValue - rData.rtValue;
         break;
     default:
+        // pc = EXCEPTION_ADDR; ?
         cerr << "Illegal function code at address "
              << "0x" << hex
              << setfill('0') << setw(8) << pc - 4 << ": " << (uint16_t)rData.funct << endl;
@@ -844,6 +847,11 @@ CycleStatus runCycle()
         nextIdex.instructionData.data.jData = jData;
         break;
     }
+    /*
+    case E:
+        pc = EXCEPTION_ADDR;
+        nextifid.instruction = 0; // squash instruction after illegal instruction exception
+    */
     }
     nextIdex.instruction = ifid.instruction;
 
@@ -855,8 +863,6 @@ CycleStatus runCycle()
     if (idex.instructionData.isMemRead() && idexRt != 0 && (idexRt == nextIdex.instructionData.rs() || idexRt == nextIdex.instructionData.rt()))
     {
         stallId = true;
-        // insert bubble into pipeline
-        nextIdex = IDEX{};
     }
 
     // execute
@@ -891,6 +897,10 @@ CycleStatus runCycle()
     {
     case R:
         nextExmem.regWriteValue = handleRInstEx(idex.instructionData.data.rData);
+        /*// illegal instruction exception
+        if (nextExmem.regWriteValue == UINT64_MAX) break;
+        
+        */
         nextExmem.regToWrite = idex.instructionData.data.rData.rd;
         break;
     case I:
@@ -938,7 +948,7 @@ CycleStatus runCycle()
         pc = nextPc;
     }
     
-    idex = nextIdex;
+    idex = stallId ? IDEX{} : nextIdex;
 
     exmem = nextExmem;
     memwb = nextMemwb;
