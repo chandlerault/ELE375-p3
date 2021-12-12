@@ -607,7 +607,7 @@ uint64_t handleRInstEx(RData &rData)
         rdValue = rData.rsValue - rData.rtValue;
         break;
     default:
-        // pc = EXCEPTION_ADDR; ?
+        // nextPc = EXCEPTION_ADDR; ?
         cerr << "Illegal function code at address "
              << "0x" << hex
              << setfill('0') << setw(8) << pc - 4 << ": " << (uint16_t)rData.funct << endl;
@@ -738,12 +738,12 @@ bool branchNeedsStall(InstructionData &currentInstr, IDEX &nextInstr, bool check
     return false;
 }
 
-void handleBranchForwarding(IData &iData, EXMEM &exmem) {
-    if (iData.rs == exmem.regToWrite && exmem.regToWrite != 0) {
-        iData.rsValue = exmem.regWriteValue;
+void handleBranchForwarding(InstructionData &instr, EXMEM &exmem) {
+    if (instr.rs() == exmem.regToWrite && exmem.regToWrite != 0) {
+        instr.rsValue(exmem.regWriteValue);
     }
-    else if (iData.rt == exmem.regToWrite && exmem.regToWrite != 0) {
-        iData.rtValue = exmem.regWriteValue;
+    else if (instr.rt() == exmem.regToWrite && exmem.regToWrite != 0) {
+        instr.rtValue(exmem.regWriteValue);
     }
 }
 /*
@@ -805,16 +805,22 @@ CycleStatus runCycle()
     {
     case R:
     {
-        nextIdex.instructionData.data.rData = getRData(ifid.instruction);
+        auto rData = getRData(ifid.instruction);
         /* // Illegal instruction exception check
         if (checkFunction(nextIdex.instructionData.data.rData.funct)){
             // todo should this be nextPc
-            pc = EXCEPTION_ADDR;
+            nextPc = EXCEPTION_ADDR;
             nextIfid.instruction = 0;
+            break;
         }
         */
-        if (nextIdex.instructionData.data.rData.funct != FUN_JR) {
-            nextIdex.regToWrite = nextIdex.instructionData.data.rData.rd;
+       nextIdex.instructionData.data.rData = rData;
+        if (rData.funct == FUN_JR) {
+            handleBranchForwarding(nextIdex.instructionData, exmem);
+            nextPc = rData.rsValue;
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
+        } else {
+            nextIdex.regToWrite = rData.rd;
         }
         break;
     }
@@ -825,7 +831,7 @@ CycleStatus runCycle()
         switch (iData.opcode)
         {
         case OP_BEQ:
-            handleBranchForwarding(iData, exmem);
+            handleBranchForwarding(nextIdex.instructionData, exmem);
             if (iData.rsValue == iData.rtValue)
             {
                 nextPc = ifid.pc + 4 +((static_cast<int32_t>(iData.seImm)) << 2);
@@ -833,7 +839,7 @@ CycleStatus runCycle()
             stallId = branchNeedsStall(nextIdex.instructionData, idex, true);
             break;
         case OP_BNE:
-            handleBranchForwarding(iData, exmem);
+            handleBranchForwarding(nextIdex.instructionData, exmem);
             if (iData.rsValue != iData.rtValue)
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
@@ -841,7 +847,7 @@ CycleStatus runCycle()
             stallId = branchNeedsStall(nextIdex.instructionData, idex, true);
             break;
         case OP_BGTZ:
-            handleBranchForwarding(iData, exmem);
+            handleBranchForwarding(nextIdex.instructionData, exmem);
             if (iData.rsValue > 0)
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
@@ -849,7 +855,7 @@ CycleStatus runCycle()
             stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
             break;
         case OP_BLEZ:
-            handleBranchForwarding(iData, exmem);
+            handleBranchForwarding(nextIdex.instructionData, exmem);
             if (iData.rsValue <= 0)
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
@@ -868,8 +874,8 @@ CycleStatus runCycle()
         switch (jData.opcode)
         {
         case OP_JAL:
-            // TODO: what to do, WB is weird
             nextIdex.regToWrite = 31;
+            nextIdex.regWriteValue = ifid.pc + 8;
             // fallthrough
         case OP_J:
             nextPc = ((ifid.pc + 4) & 0xf0000000) | (jData.addr << 2);
@@ -880,7 +886,7 @@ CycleStatus runCycle()
     }
     /*
     case E:
-        pc = EXCEPTION_ADDR;
+        nextPc = EXCEPTION_ADDR;
         nextifid.instruction = 0; // squash instruction after illegal instruction exception
     */
     }
