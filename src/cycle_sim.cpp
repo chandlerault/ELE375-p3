@@ -685,7 +685,7 @@ CycleStatus runCycle()
         stallIf = true;
     }
     nextIfid.pc = pc;
-    pc += 4;
+    uint32_t nextPc = pc + 4;
     nextIfid.instruction = instruction;
     if (instruction == 0xfeedfeed) haltSeen = true;
 
@@ -706,28 +706,28 @@ CycleStatus runCycle()
         case OP_BEQ:
             if (iData.rsValue == iData.rtValue)
             {
-                pc = ifid.pc + 4 +((static_cast<int32_t>(iData.seImm)) << 2);
+                nextPc = ifid.pc + 4 +((static_cast<int32_t>(iData.seImm)) << 2);
                 break;
             }
             break;
         case OP_BNE:
             if (iData.rsValue != iData.rtValue)
             {
-                pc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
+                nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
                 break;
             }
             break;
         case OP_BGTZ:
             if (iData.rsValue > 0)
             {
-                pc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
+                nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
                 break;
             }
             break;
         case OP_BLEZ:
             if (iData.rsValue <= 0)
             {
-                pc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
+                nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
                 break;
             }
             break;
@@ -745,7 +745,7 @@ CycleStatus runCycle()
         case OP_JAL:
             // TODO: what to do, WB is weird
         case OP_J:
-            pc = ((ifid.pc + 4) & 0xf0000000) | (jData.addr << 2);
+            nextPc = ((ifid.pc + 4) & 0xf0000000) | (jData.addr << 2);
             break;
         }
         nextIdex.instructionData.data.jData = jData;
@@ -840,10 +840,9 @@ CycleStatus runCycle()
     pipeState.wbInstr = memwb.instruction;
 
     // finish cycle
-    if (stallIf || stallId) {
-        pc = nextIfid.pc;
-    } else {
+    if (!stallIf && !stallId) {
         ifid = nextIfid;
+        pc = nextPc;
     }
     
     idex = nextIdex;
