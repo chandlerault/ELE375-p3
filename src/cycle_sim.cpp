@@ -334,12 +334,15 @@ uint64_t getCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t 
     uint32_t value = 0;
     int ret = mem->getMemValue(addr, value, size);
 
-    // cache miss logic
-    // if (value == UINT64_MAX && cache.type == ICACHE) simStats.icMisses++;
-    // 
+    /* cache miss logic
+    if (cache.type == ICACHE){
+        if (simStats.icMisses++;)
+        simStats.icMisses++;
+    } 
+    // else simSt
     // if (value == UINT64_MAX && cache.type == DCACHE) simStats.dcMisses++;
 
-    
+    */
 
     if (ret)
     {
@@ -564,7 +567,7 @@ uint64_t handleRInstEx(RData &rData)
         break;
     case FUN_SUB:
     case FUN_SUBU:
-        rdValue = rData.rsValue = rData.rtValue;
+        rdValue = rData.rsValue - rData.rtValue;
         break;
     default:
         cerr << "Illegal function code at address "
