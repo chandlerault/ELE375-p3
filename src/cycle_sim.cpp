@@ -94,10 +94,11 @@ enum FUN_IDS
     FUN_SUBU = 0x23
 };
 
-//enum CACHE_VALUE {
-//   DCACHE;
-//   ICACHE;
-//}
+/* // Cache values stored 
+enum CACHE_VALUE {
+   ICACHE;
+   DCACHE;
+}*/
 
 //Static global variables...
 static uint32_t regs[NUM_REGS];
@@ -334,14 +335,15 @@ uint64_t getCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t 
     uint32_t value = 0;
     int ret = mem->getMemValue(addr, value, size);
 
-    /* cache miss logic
+    /*// cache miss and hit logic for loads
     if (cache.type == ICACHE){
-        if (simStats.icMisses++;)
-        simStats.icMisses++;
+        if (value == UINT64_MAX) simStats.icMisses++;
+        else simStats.icHits++;
     } 
-    // else simSt
-    // if (value == UINT64_MAX && cache.type == DCACHE) simStats.dcMisses++;
-
+    else {
+        if (value == UINT64_MAX) simStats.dcMisses++;
+        else simStats.dcHits++;
+    }
     */
 
     if (ret)
@@ -375,6 +377,16 @@ bool setCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t addr
     {
     case BYTE_SIZE:
         ret = mem->setMemValue(addr, value & 0xFF, BYTE_SIZE);
+        /*// cache miss and hit logic for loads
+        if (cache.type == ICACHE){
+            if (ret) simStats.icHits++;
+            else simStats.icMisses++;
+        } 
+        else {
+            if (ret) simStats.dcMisses++;
+            else simStats.dcHits++;
+        }
+        */
         break;
     case HALF_SIZE:
         ret = mem->setMemValue(addr, value & 0xFFFF, HALF_SIZE);
@@ -627,8 +639,9 @@ void handleJInstEx(JData &jData)
 }
 
 // returns non zero when stall
-int handleMem(IData &iData)
+int handleMem(EXMEM &exmem)
 {
+    IData &iData = exmem.instructionData.data.iData;
     uint32_t addr = iData.rsValue + iData.seImm;
     uint32_t data = 0;
     // TODO: perform operations through cache
@@ -660,7 +673,7 @@ int handleMem(IData &iData)
             // TODO stall
         }
         else
-            iData.rtValue = data;
+            exmem.regWriteValue = data;
         break;
     case OP_LHU:
         data = getCacheValue(&dcache, memStore, pipeState.cycle, addr, HALF_SIZE);
@@ -670,7 +683,7 @@ int handleMem(IData &iData)
             // TODO stall
         }
         else
-            iData.rtValue = data;
+            exmem.regWriteValue = data;
         break;
     case OP_LW:
         data = getCacheValue(&dcache, memStore, pipeState.cycle, addr, WORD_SIZE);
@@ -679,7 +692,7 @@ int handleMem(IData &iData)
             // TODO stall
         }
         else
-            iData.rtValue = data;
+            exmem.regWriteValue = data;
         break;
     }
     return 0;
