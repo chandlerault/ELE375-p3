@@ -825,8 +825,8 @@ CycleStatus runCycle()
     }
     case I:
     {
-        auto iData = getIData(ifid.instruction);
-        nextIdex.instructionData.data.iData = iData;
+        nextIdex.instructionData.data.iData = getIData(ifid.instruction);
+        auto &iData = nextIdex.instructionData.data.iData;
         switch (iData.opcode)
         {
         case OP_BEQ:
