@@ -861,6 +861,10 @@ CycleStatus runCycle()
             }
             stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
             break;
+        case OP_SB:
+        case OP_SH:
+        case OP_SW:
+            break;
         default:
             nextIdex.regToWrite = iData.rt;
             break;
