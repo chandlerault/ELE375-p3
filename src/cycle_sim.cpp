@@ -94,6 +94,11 @@ enum FUN_IDS
     FUN_SUBU = 0x23
 };
 
+//enum CACHE_VALUE {
+//   DCACHE;
+//   ICACHE;
+//}
+
 //Static global variables...
 static uint32_t regs[NUM_REGS];
 
@@ -320,7 +325,7 @@ using MEMWB = EXMEM;
 
 struct Cache
 {
-    // type = 
+    // CACHE_VALUE type;
 };
 
 // returns UINT64_MAX if result is not available in the cache yet, the value at the address otherwise
@@ -331,6 +336,7 @@ uint64_t getCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t 
 
     // cache miss logic
     // if (value == UINT64_MAX && cache.type == ICACHE) simStats.icMisses++;
+    // 
     // if (value == UINT64_MAX && cache.type == DCACHE) simStats.dcMisses++;
 
     
@@ -554,7 +560,7 @@ uint64_t handleRInstEx(RData &rData)
         rdValue = rData.rtValue << rData.shamt;
         break;
     case FUN_SRL:
-        rdValue = rData.rsValue >> rData.shamt;
+        rdValue = rData.rtValue >> rData.shamt;
         break;
     case FUN_SUB:
     case FUN_SUBU:
