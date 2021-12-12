@@ -487,6 +487,7 @@ IDEX idex;
 EXMEM exmem;
 MEMWB memwb;
 bool haltSeen;
+CycleStatus cycleStatus{};
 
 int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mainMem)
 {
@@ -500,6 +501,7 @@ int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mai
     exmem = EXMEM{};
     memwb = MEMWB{};
     haltSeen = false;
+    cycleStatus = CycleStatus{};
     return 0;
 }
 
@@ -688,7 +690,6 @@ enum CycleStatus {
 
 CycleStatus runCycle()
 {
-    CycleStatus cycleStatus{};
     IFID nextIfid{};
     IDEX nextIdex{};
     EXMEM nextExmem{};
