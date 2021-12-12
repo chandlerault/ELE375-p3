@@ -448,6 +448,8 @@ enum INST_TYPE getInstType(uint32_t instr)
     case OP_ANDI:
     case OP_BEQ:
     case OP_BNE:
+    case OP_BGTZ:
+    case OP_BLEZ:
     case OP_LBU:
     case OP_LHU:
     case OP_LL:
