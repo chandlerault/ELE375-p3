@@ -841,7 +841,7 @@ CycleStatus runCycle()
 
     // finish cycle
     if (stallIf || stallId) {
-        pc -= 4;
+        pc = ifid.pc;
     } else {
         ifid = nextIfid;
     }
