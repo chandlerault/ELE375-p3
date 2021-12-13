@@ -163,7 +163,7 @@ int Cache::setCacheByte(uint32_t address, uint32_t value, uint32_t cycle) {
             if (metaDataBits[addrIndex][i].cycleReady > cycle) {
                 return 1; // we've hit before, but are emulating latency 
             }
-            cacheData[addrIndex][assoc][blockOffset] = (uint8_t) value;
+            cacheData[addrIndex][i][blockOffset] = (uint8_t) value;
             metaDataBits[addrIndex][i].dirty = 1;
             updateLRU(addrIndex, i);
             return 0;
