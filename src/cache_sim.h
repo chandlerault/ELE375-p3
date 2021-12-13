@@ -43,7 +43,7 @@ class Cache {
         int setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, uint32_t cycle);
         uint32_t getHits();
         uint32_t getMisses();
-        int cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, uint32_t blockOffset);
+        uint32_t cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, uint32_t blockOffset);
         void drain();
         ~Cache();
 };
