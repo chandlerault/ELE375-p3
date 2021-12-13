@@ -1,4 +1,4 @@
-.word 0xffffffff
+sllv $zero, $zero, $zero
 .word 0xfeedfeed
 .space 0x7ff8
 addi $t0, $zero, 4
