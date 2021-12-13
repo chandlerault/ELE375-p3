@@ -8,5 +8,7 @@ main:   addi    $t0, $zero, -32         # $t0 =   0xFFFFFFE0
         sh      $t1, 72($zero)          # M[72] = 0x0000FFFF
         sw      $t2, 76($zero)          # M[76] = 0xABCD0000
         sw      $t1, 76($t3)            # M[80] = 0xFFFFFE0C
-        sw      $t1, 44($t0)            # M[12] = 0xFFFFFE0C
+        lw	$t4, 80($zero)		# t4 = 0xFFFFFE0C
+        sw      $t4, 80($t3)            # M[84] = 0xFFFFFE0C
+
         .word   0xfeedfeed              # M = 48

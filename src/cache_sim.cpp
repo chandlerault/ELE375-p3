@@ -36,18 +36,21 @@ Cache::Cache(CacheConfig &config, MemoryStore *mem) {
         numSets = numBlocks;
     }
     for (int i; i < numSets; i++) {
+        metaDataBits.emplace_back();
         for (int j; j < assoc; j++) {
-            metaDataBits[i][j].valid = 0;
-            metaDataBits[i][j].tag = 0;
-            metaDataBits[i][j].dirty  = 0;
-            metaDataBits[i][j].lru = 0;
+            metaDataBits[i].emplace_back();
+            // metaDataBits[i][j].tag = 0;
+            // metaDataBits[i][j].dirty  = 0;
+            // metaDataBits[i][j].lru = 0;
         }
     }
 
     for (int i; i < numSets; i++) {
+        cacheData.emplace_back();        
         for (int j; j < assoc; j++) {
-            for(int k; k<blockSize; k++) {
-                cacheData[i][j][k] = 0;
+            cacheData[i].emplace_back();
+            for (int k; k<blockSize; k++) {
+                cacheData[i][j].emplace_back();
             }
         }
     }
@@ -121,11 +124,11 @@ int Cache::setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, ui
 
 int Cache::getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle){
     uint32_t addressCopy = address;
-    uint32_t addrTag = addressCopy >> (tagStart);
+    uint32_t addrTag = addressCopy << (ADDRESS_LEN - tagEnd) >> (ADDRESS_LEN-tagEnd) >> (tagStart);
     addressCopy = address;
-    uint32_t addrIndex = (addressCopy << (tagEnd - indexEnd)) >> (ADDRESS_LEN - indexEnd - indexStart);
+    uint32_t addrIndex = addressCopy << (ADDRESS_LEN - indexEnd) >> (ADDRESS_LEN - indexEnd) >> indexStart;
     addressCopy = address;
-    uint32_t blockOffset = addressCopy << (ADDRESS_LEN - offsetEnd) >> (ADDRESS_LEN - offsetEnd- offsetStart);
+    uint32_t blockOffset = addressCopy << (ADDRESS_LEN - offsetEnd) >> (ADDRESS_LEN - offsetEnd) >> offsetStart;
 
         // iterate through each block in a set
        for (int i; i< assoc; i++) {
@@ -148,11 +151,11 @@ int Cache::getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle){
 
 int Cache::setCacheByte(uint32_t address, uint32_t value, uint32_t cycle) {
     uint32_t addressCopy = address;
-    uint32_t addrTag = addressCopy >> (tagStart);
+    uint32_t addrTag = (ADDRESS_LEN - tagEnd) >> (ADDRESS_LEN-tagEnd) >> (tagStart);
     addressCopy = address;
-    uint32_t addrIndex = (addressCopy << (tagEnd - indexEnd)) >> (ADDRESS_LEN - indexEnd - indexStart);
+    uint32_t addrIndex = (addressCopy << (ADDRESS_LEN - indexEnd)) >> (ADDRESS_LEN - indexEnd) >> indexStart;
     addressCopy = address;
-    uint32_t blockOffset = addressCopy << (ADDRESS_LEN - offsetEnd) >> (ADDRESS_LEN - offsetEnd- offsetStart);
+    uint32_t blockOffset = addressCopy << (ADDRESS_LEN - offsetEnd) >> (ADDRESS_LEN - offsetEnd) >> offsetStart;
 
     // loop through blocks in the set, starting at startBlock
     for (int i = 0; i < assoc; i++) {
