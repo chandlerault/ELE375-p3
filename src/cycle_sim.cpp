@@ -2,7 +2,7 @@
 #include <iomanip>
 #include <fstream>
 #include <string.h>
-#include <algorithm.h>
+#include <algorithm>
 #include <errno.h>
 #include "MemoryStore.h"
 #include "RegisterInfo.h"
