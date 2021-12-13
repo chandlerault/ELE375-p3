@@ -608,7 +608,7 @@ bool handleImmInstEx(IData &iData, uint64_t &rtValue)
 }
 
 // returns true when stall, false otherwise
-bool handleMem(EXMEM &exmem)
+int handleMem(EXMEM &exmem)
 {
     IData &iData = exmem.instructionData.data.iData;
     uint32_t addr = iData.rsValue + iData.seImm;
@@ -618,7 +618,7 @@ bool handleMem(EXMEM &exmem)
     switch (iData.opcode)
     {
     case OP_SB:
-        return dcache->setCacheValue(addr, iData.rtValue, BYTE_SIZE, pipeState.cycle;
+        return dcache->setCacheValue(addr, iData.rtValue, BYTE_SIZE, pipeState.cycle);
     case OP_SH:
         return dcache->setCacheValue(addr, iData.rtValue, HALF_SIZE, pipeState.cycle);
     case OP_SW:
@@ -758,7 +758,7 @@ CycleStatus runCycle()
         if (delay)
         {
             stallIf = true;
-            memHaltCycles = std:max(memHaltCycles, delay);
+            memHaltCycles = std::max(memHaltCycles, delay);
         }
     }
 
