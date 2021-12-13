@@ -35,9 +35,9 @@ Cache::Cache(CacheConfig &config, MemoryStore *mem) {
     } else {
         numSets = numBlocks;
     }
-    for (int i; i < numSets; i++) {
+    for (int i = 0; i < numSets; i++) {
         metaDataBits.emplace_back();
-        for (int j; j < assoc; j++) {
+        for (int j = 0; j < assoc; j++) {
             metaDataBits[i].emplace_back();
             // metaDataBits[i][j].tag = 0;
             // metaDataBits[i][j].dirty  = 0;
@@ -45,11 +45,11 @@ Cache::Cache(CacheConfig &config, MemoryStore *mem) {
         }
     }
 
-    for (int i; i < numSets; i++) {
+    for (int i = 0; i < numSets; i++) {
         cacheData.emplace_back();        
-        for (int j; j < assoc; j++) {
+        for (int j = 0; j < assoc; j++) {
             cacheData[i].emplace_back();
-            for (int k; k<blockSize; k++) {
+            for (int k = 0; k<blockSize; k++) {
                 cacheData[i][j].emplace_back();
             }
         }
@@ -71,7 +71,7 @@ int Cache::getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, 
     value = 0;
 
     // look at each byte  
-    for(int i; i< size; i++){
+    for(int i = 0; i< size; i++){
         uint32_t byteAddr = address+i;
         uint32_t byte;
         miss = getCacheByte(byteAddr, byte, cycle);
@@ -131,7 +131,7 @@ int Cache::getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle){
     uint32_t blockOffset = addressCopy << (ADDRESS_LEN - offsetEnd) >> (ADDRESS_LEN - offsetEnd) >> offsetStart;
 
         // iterate through each block in a set
-       for (int i; i< assoc; i++) {
+       for (int i = 0; i< assoc; i++) {
         // read Hit
         if(metaDataBits[addrIndex][i].valid  && metaDataBits[addrIndex][i].tag == addrTag) {
             if (metaDataBits[addrIndex][i].cycleReady > cycle) return 1;
@@ -221,7 +221,7 @@ int Cache::cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, uint32_
 }
 
 void Cache::updateLRU(int addrIndex, int recentlyUsed){
-    for(int i; i < assoc; i++) {
+    for(int i = 0; i < assoc; i++) {
         if(metaDataBits[addrIndex][recentlyUsed].lru > metaDataBits[addrIndex][recentlyUsed].lru) {
             metaDataBits[addrIndex][i].lru -= 1;
         }
@@ -239,7 +239,7 @@ uint32_t Cache::getMisses() {
 
 void Cache::drain() {
     for (int setNum = 0; setNum < numSets; setNum++) {
-        for(int i =0; i< assoc; i++){
+        for(int i = 0; i< assoc; i++){
             if (metaDataBits[setNum][i].valid && metaDataBits[setNum][i].dirty) {
                 uint32_t memAddr = (metaDataBits[setNum][i].tag << tagStart) | (setNum << indexStart);
                 for (int byte_offset = 0; byte_offset < blockSize; byte_offset++) {
