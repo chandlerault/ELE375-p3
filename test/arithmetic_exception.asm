@@ -5,11 +5,11 @@ addu   $t2, $t0, $t1
 subu   $t3, $t0, $t9 
 addiu  $t4, $t0, 4
 
-li     $ra, 32 
+li     $ra, 36 
 add    $t5, $t0, $t1 
-li     $ra, 40 
+li     $ra, 44 
 sub    $t6, $t1, $t0 
-li     $ra, 48 
+li     $ra, 52 
 addi   $t7, $t0, 2 
 .word  0xfeedfeed
 
