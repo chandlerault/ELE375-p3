@@ -130,7 +130,7 @@ int Cache::getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle){
        for (uint32_t i = 0; i< assoc; i++) {
         // read Hit
         if(metaDataBits[addrIndex][i].valid  && metaDataBits[addrIndex][i].tag == addrTag) {
-            // if (metaDataBits[addrIndex][i].cycleReady > cycle) return 0;
+            if (metaDataBits[addrIndex][i].cycleReady > cycle) return missLatency;
             value = cacheData[addrIndex][i][blockOffset];
             updateLRU(addrIndex, i);
             // helper function to keep track of LRU block for each set in cache
@@ -156,9 +156,9 @@ int Cache::setCacheByte(uint32_t address, uint32_t value, uint32_t cycle) {
     // loop through blocks in the set, starting at startBlock
     for (uint32_t i = 0; i < assoc; i++) {
         if (metaDataBits[addrIndex][i].valid  && metaDataBits[addrIndex][i].tag == addrTag) { // WRITE HIT
-            // if (metaDataBits[addrIndex][i].cycleReady > cycle) {
-            //     return CacheByteResult{false, false}; // we've hit before, but are emulating latency 
-            // }
+            if (metaDataBits[addrIndex][i].cycleReady > cycle) {
+                return missLatency; // we've hit before, but are emulating latency 
+            }
             cacheData[addrIndex][i][blockOffset] = (uint8_t) value;
             metaDataBits[addrIndex][i].dirty = 1;
             updateLRU(addrIndex, i);
