@@ -1,3 +1,4 @@
+.set noreorder
 li     $t0, 0x7fffffff
 li     $t1, 2
 li     $t9, -3
