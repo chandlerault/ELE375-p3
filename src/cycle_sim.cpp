@@ -467,16 +467,60 @@ int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mai
     return 0;
 }
 
-// returns new value of rd, or UINT64_MAX if none
-uint64_t handleRInstEx(RData &rData)
+uint8_t getSign(uint32_t value)
 {
-    uint64_t rdValue = UINT64_MAX;
+    return (value >> 31) & 0x1;
+}
+
+// returns true if overflow occured, false otherwise 
+// writes the result to result if no overflow occured
+bool doAddSub(uint32_t s1, uint32_t s2, bool isAdd, bool checkOverflow, uint64_t &result)
+{
+    bool overflow = false;
+
+    if(isAdd)
+    {
+        result = static_cast<int32_t>(s1) + static_cast<int32_t>(s2);
+    }
+    else
+    {
+        result = static_cast<int32_t>(s1) - static_cast<int32_t>(s2);
+    }
+
+    if(checkOverflow)
+    {
+        if(isAdd)
+        {
+            overflow = getSign(s1) == getSign(s2) && getSign(s2) != getSign(result);
+        }
+        else
+        {
+            overflow = getSign(s1) != getSign(s2) && getSign(s2) == getSign(result);
+        }
+    }
+
+    if(overflow)
+    {
+        //Inform the caller that overflow occurred so it can take appropriate action.
+        return true;
+    }
+
+    //Otherwise update state and return success.
+    result = static_cast<uint32_t>(result);
+
+    return false;
+}
+
+// sets rdValue to new value of rd, or UINT64_MAX if none
+// returns true if instruction caused exception, false otherwise
+bool handleRInstEx(RData &rData, uint64_t &rdValue)
+{
     switch (rData.funct)
     {
     case FUN_ADD:
+        return doAddSub(rData.rsValue, rData.rtValue, true, true, rdValue);
     case FUN_ADDU:
-        rdValue = rData.rsValue + rData.rtValue;
-        break;
+        return doAddSub(rData.rsValue, rData.rtValue, true, false, rdValue);
     case FUN_AND:
         rdValue = rData.rsValue & rData.rtValue;
         break;
@@ -501,9 +545,9 @@ uint64_t handleRInstEx(RData &rData)
         rdValue = rData.rtValue >> rData.shamt;
         break;
     case FUN_SUB:
+        return doAddSub(rData.rsValue, rData.rtValue, false, true, rdValue);
     case FUN_SUBU:
-        rdValue = rData.rsValue - rData.rtValue;
-        break;
+        return doAddSub(rData.rsValue, rData.rtValue, false, false, rdValue);
     default:
         // nextPc = EXCEPTION_ADDR; ?
         cerr << "Illegal function code at address "
@@ -513,7 +557,7 @@ uint64_t handleRInstEx(RData &rData)
         break;
     }
 
-    return rdValue;
+    return false;
 }
 
 // returns new value of rt destination, or UINT64_MAX if no new value
@@ -718,9 +762,8 @@ CycleStatus runCycle()
         if (!isFuncCodeValid(nextIdex.instructionData.data.rData.funct)){
             nextPc = EXCEPTION_ADDR;
             nextIfid.instruction = 0;
-            ifid.instruction = 0;
             haltSeen = false;
-            nextIdex.instructionData.data.rData = RData{};
+            nextIdex.instructionData = InstructionData{};
             break;
         }
         if (nextIdex.instructionData.data.rData.funct == FUN_JR) {
@@ -798,11 +841,11 @@ CycleStatus runCycle()
     }
     case E:
         nextPc = EXCEPTION_ADDR;
-        ifid.instruction = 0;
         nextIfid.instruction = 0; // squash instruction after illegal instruction exception
         haltSeen = false;
+        nextIdex = IDEX{};
     }
-    nextIdex.instruction = ifid.instruction;
+    if (nextIdex.instructionData.tag != E) nextIdex.instruction = ifid.instruction;
 
     // if (ID/EX.MemRead and
     //  ((ID/EX.RegisterRt = IF/ID.RegisterRs) or
@@ -847,7 +890,14 @@ CycleStatus runCycle()
     switch (idex.instructionData.tag)
     {
     case R:
-        nextExmem.regWriteValue = handleRInstEx(idex.instructionData.data.rData);
+        if (handleRInstEx(idex.instructionData.data.rData, nextExmem.regWriteValue)) {
+            // overflow occured
+            nextPc = EXCEPTION_ADDR;
+            nextIfid.instruction = 0;
+            nextIdex = IDEX{};
+            nextExmem = EXMEM{};
+            haltSeen = false;
+        }
         break;
     case I:
         nextExmem.regWriteValue = handleImmInstEx(idex.instructionData.data.iData);
