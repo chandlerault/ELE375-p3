@@ -956,6 +956,9 @@ CycleStatus runCycle()
     if (!stallMem) {
         exmem = nextExmem;
         memwb = nextMemwb;
+    } else {
+        // insert bubble
+        memwb = MEMWB{};
     }
 
     return cycleStatus;
