@@ -1005,7 +1005,9 @@ int runCycles(unsigned int cycles) {
     for(; cycles > 0 && cycleStatus != HALTED; cycles--) {
         cycleStatus = runCycle();
     }
+    pipeState.cycle--;
     dumpPipeState(pipeState);
+    pipeState.cycle++;
     return cycleStatus == HALTED;
 }
 int runTillHalt() {
@@ -1013,11 +1015,26 @@ int runTillHalt() {
     do {
         cycleStatus = runCycle();
     } while(cycleStatus != HALTED);
+    pipeState.cycle--;
     dumpPipeState(pipeState);
+    pipeState.cycle++;
     return 0;
 }          
 int finalizeSimulator() {
     //Set the register values in the struct for printing...
+    // SimulationStats s;
+    // s.icHits = ic->getHits();
+    // s.icMisses = ic->getMisses();
+    // s.dcHits = dc->getHits();
+    // s.dcMisses = dc->getMisses();
+    //printSimStats(s)
+
+    // ic->drain();
+    // dc->drain();
+
+    // deleteCache(ic);
+    // deleteCache(dc);
+
     RegisterInfo reg;
     memset(&reg, 0, sizeof(RegisterInfo));
     fillRegisterState(reg);
