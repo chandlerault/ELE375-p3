@@ -554,7 +554,9 @@ SimulationStats simStats{};
 int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mainMem)
 {
     icache = Cache{};
+    //createCache(icConfig, mainMem);
     dcache = Cache{};
+    //createCache(dcConfig, mainMem);
     pipeState = PipeState{};
     pc = 0;
     memStore = mainMem;
@@ -748,6 +750,13 @@ void handleBranchForwarding(InstructionData &instr, EXMEM &exmem) {
         instr.rtValue(exmem.regWriteValue);
     }
 }
+
+void handleMemForwarding(InstructionData &instr, MEMWB &memwb) {
+    if (instr.rt() == memwb.regToWrite && memwb.regToWrite != 0 && memwb.regWriteValue != UINT64_MAX) {
+        instr.rtValue(memwb.regWriteValue);
+    }
+}
+
 /*
 int checkFunction(uint8_t funct){
     switch (funct)
@@ -953,6 +962,7 @@ CycleStatus runCycle()
 
     // mem
     if (exmem.instructionData.tag == I) {
+        handleMemForwarding(exmem.instructionData, memwb);
         // TODO: handle stalls
         handleMem(exmem);
     }
