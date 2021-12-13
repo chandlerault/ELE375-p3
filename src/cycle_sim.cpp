@@ -941,6 +941,11 @@ CycleStatus runCycle()
         pc = nextPc;
     }
 
+    if (stallIf) {
+        // insert bubble
+        ifid = IFID{};
+    }
+
     if (!stallId && !stallMem) {
         idex = nextIdex;
     } else if (stallId && !stallMem) {
