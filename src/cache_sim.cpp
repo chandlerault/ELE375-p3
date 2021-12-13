@@ -83,7 +83,7 @@ void Cache::getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size,
         }
         value = value | (byte << ((size-1-i)*8));
     }
-    }
+}
 
     // cache read miss procedure:
     // check the dirty bit if its 1 we write back, if its 0 we dont write back
@@ -99,11 +99,11 @@ void Cache::getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size,
     
 
 int Cache::setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, uint32_t cycle) {
-    //uint32_t mask = 0xFF;
+    uint32_t mask = 0xFF;
     uint32_t latency = 0;
     bool miss;
     for (int i = 0; i < size; i++) {
-        //uint32_t byte = (value & (mask << ((size-1-i)*8))) >> ((size-1-i)*8);
+        uint32_t byte = (value & (mask << ((size-1-i)*8))) >> ((size-1-i)*8);
         uint32_t byte;
         miss = setCacheByte(address + i, byte, cycle);
         if(i ==0){
@@ -120,7 +120,6 @@ int Cache::setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, ui
     return latency;
 }
 
-// should we return MISS or DATA variable or BOTH? 
 int Cache::getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle){
     uint32_t addressCopy = address;
     uint32_t addrTag = addressCopy >> (tagStart);

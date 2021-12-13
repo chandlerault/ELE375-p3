@@ -8,6 +8,8 @@
 #include "EndianHelpers.h"
 #include "DriverFunctions.h"
 
+// #include "cache_sim.h"
+
 #define EXCEPTION_ADDR 0x8000
 using namespace std;
 //TODO: Fix the error messages to output the correct PC in case of errors.
@@ -655,12 +657,6 @@ uint64_t handleImmInstEx(IData &iData)
     return rtValue;
 }
 
-void handleJInstEx(JData &jData)
-{
-    // TODO: is this needed? what to do for jal
-    return;
-}
-
 // returns non zero when stall
 int handleMem(EXMEM &exmem)
 {
@@ -721,14 +717,23 @@ int handleMem(EXMEM &exmem)
     return 0;
 }
 
-bool branchNeedsStall(InstructionData &currentInstr, IDEX &nextInstr, bool checkRt) {
-    // TODO: check for mem op
-    
-    if (currentInstr.rs() == nextInstr.regToWrite && nextInstr.regToWrite != 0) {
+bool branchNeedsStall(InstructionData &currentInstr, IDEX &nextInstr, EXMEM &nextNextInstr, bool checkRt) {
+    auto rs = currentInstr.rs();
+    auto rt = currentInstr.rt();
+
+    if(rs == nextNextInstr.regToWrite && nextNextInstr.regToWrite != 0 && nextNextInstr.instructionData.isMemRead()) {
         return true;
     }
 
-    if (checkRt && currentInstr.rt() == nextInstr.regToWrite && nextInstr.regToWrite != 0) {
+    if(checkRt && rt == nextNextInstr.regToWrite && nextNextInstr.regToWrite != 0 && nextNextInstr.instructionData.isMemRead()) {
+        return true;
+    }
+    
+    if (rs == nextInstr.regToWrite && nextInstr.regToWrite != 0) {
+        return true;
+    }
+
+    if (checkRt && rt == nextInstr.regToWrite && nextInstr.regToWrite != 0) {
         return true;
     }
 
@@ -942,7 +947,6 @@ CycleStatus runCycle()
         break;
     case J:
     {
-        handleJInstEx(idex.instructionData.data.jData);
         break;
     }
     }
