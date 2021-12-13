@@ -194,8 +194,8 @@ enum INST_TYPE
 {
     R,
     I,
-    J //,
-    //E // for illegal excepetion
+    J,
+    E // for illegal excepetion
 };
 
 struct RData
@@ -369,12 +369,9 @@ enum INST_TYPE getInstType(uint32_t instr)
     case OP_JAL:
         return J;
         break;
-    //default:
-    // return E;
+    default:
+        return E;
     }
-    // TODO: notify caller somehow, for illegal arg exception
-    std::cerr << "Unknown exception encountered" << endl;
-    exit(1);
 }
 
 // Arg: current instruction
@@ -652,8 +649,7 @@ void handleMemForwarding(InstructionData &instr, MEMWB &memwb) {
     }
 }
 
-/*
-int checkFunction(uint8_t funct){
+bool isFuncCodeValid(uint8_t funct){
     switch (funct)
     {
     case FUN_ADD:
@@ -668,12 +664,11 @@ int checkFunction(uint8_t funct){
     case FUN_SRL:
     case FUN_SUB:
     case FUN_SUBU:
-        return 0;
+        return true;
     default:
-        return 1;
+        return false;
     }
 }
-*/
 
 
 CycleStatus runCycle()
@@ -716,14 +711,15 @@ CycleStatus runCycle()
     case R:
     {
         nextIdex.instructionData.data.rData = getRData(ifid.instruction);
-        /* // Illegal instruction exception check
-        if (checkFunction(nextIdex.instructionData.data.rData.funct)){
-            // todo should this be nextPc
+
+        // Illegal instruction exception check
+        if (!isFuncCodeValid(nextIdex.instructionData.data.rData.funct)){
             nextPc = EXCEPTION_ADDR;
             nextIfid.instruction = 0;
+            ifid.instruction = 0;
+            nextIdex.instructionData.data.rData = RData{};
             break;
         }
-        */
         if (nextIdex.instructionData.data.rData.funct == FUN_JR) {
             handleBranchForwarding(nextIdex.instructionData, exmem);
             nextPc = nextIdex.instructionData.data.rData.rsValue;
@@ -797,11 +793,10 @@ CycleStatus runCycle()
         nextIdex.instructionData.data.jData = jData;
         break;
     }
-    /*
     case E:
         nextPc = EXCEPTION_ADDR;
-        nextifid.instruction = 0; // squash instruction after illegal instruction exception
-    */
+        ifid.instruction = 0;
+        nextIfid.instruction = 0; // squash instruction after illegal instruction exception
     }
     nextIdex.instruction = ifid.instruction;
 
