@@ -437,8 +437,8 @@ enum CycleStatus {
     HALTED
 };
 
-Cache icache;
-Cache dcache;
+Cache *icache;
+Cache *dcache;
 PipeState pipeState;
 uint32_t pc;
 MemoryStore *memStore;
@@ -452,10 +452,9 @@ SimulationStats simStats{};
 
 int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mainMem)
 {
-    icache = Cache{icConfig, mainMem};
-    //createCache(icConfig, mainMem);
-    dcache = Cache{dcConfig, mainMem};
-    //createCache(dcConfig, mainMem);
+    icache = new Cache{icConfig, mainMem};
+    dcache = new Cache{dcConfig, mainMem};
+
     pipeState = PipeState{};
     pc = 0;
     memStore = mainMem;
@@ -569,25 +568,25 @@ bool handleMem(EXMEM &exmem)
     switch (iData.opcode)
     {
     case OP_SB:
-        if (dcache.setCacheValue(addr, iData.rtValue, BYTE_SIZE, pipeState.cycle))
+        if (dcache->setCacheValue(addr, iData.rtValue, BYTE_SIZE, pipeState.cycle))
         {
             return true;
         }
         break;
     case OP_SH:
-        if (dcache.setCacheValue(addr, iData.rtValue, HALF_SIZE, pipeState.cycle))
+        if (dcache->setCacheValue(addr, iData.rtValue, HALF_SIZE, pipeState.cycle))
         {
             return true;
         }
         break;
     case OP_SW:
-        if (dcache.setCacheValue(addr, iData.rtValue, WORD_SIZE, pipeState.cycle))
+        if (dcache->setCacheValue(addr, iData.rtValue, WORD_SIZE, pipeState.cycle))
         {
             return true;
         }
         break;
     case OP_LBU:
-        dcache.getCacheValue(addr, data, BYTE_SIZE, pipeState.cycle);
+        dcache->getCacheValue(addr, data, BYTE_SIZE, pipeState.cycle);
         if (data == UINT64_MAX)
         {
             return true;
@@ -596,7 +595,7 @@ bool handleMem(EXMEM &exmem)
             exmem.regWriteValue = data;
         break;
     case OP_LHU:
-        dcache.getCacheValue(addr, data, HALF_SIZE, pipeState.cycle);
+        dcache->getCacheValue(addr, data, HALF_SIZE, pipeState.cycle);
         if (data == UINT64_MAX)
         {
 
@@ -606,7 +605,7 @@ bool handleMem(EXMEM &exmem)
             exmem.regWriteValue = data;
         break;
     case OP_LW:
-        dcache.getCacheValue(addr, data, WORD_SIZE, pipeState.cycle);
+        dcache->getCacheValue(addr, data, WORD_SIZE, pipeState.cycle);
         if (data == UINT64_MAX)
         {
             return true;
@@ -701,7 +700,7 @@ CycleStatus runCycle()
 
     // instructionFetch
     uint32_t instruction;
-    icache.getCacheValue(pc, instruction, MemEntrySize::WORD_SIZE, pipeState.cycle);
+    icache->getCacheValue(pc, instruction, MemEntrySize::WORD_SIZE, pipeState.cycle);
     instruction = haltSeen ? 0 : instruction;
     if (instruction == UINT64_MAX)
     {
@@ -927,19 +926,19 @@ int runTillHalt() {
     return 0;
 }          
 int finalizeSimulator() {
-    //Set the register values in the struct for printing...
-    // SimulationStats s;
-    // s.icHits = ic->getHits();
-    // s.icMisses = ic->getMisses();
-    // s.dcHits = dc->getHits();
-    // s.dcMisses = dc->getMisses();
-    // printSimStats(s)
+    // Set the register values in the struct for printing...
+    SimulationStats s;
+    s.icHits = icache->getHits();
+    s.icMisses = icache->getMisses();
+    s.dcHits = dcache->getHits();
+    s.dcMisses = dcache->getMisses();
+    printSimStats(s);
 
-    // ic->drain();
-    // dc->drain();
+    icache->drain();
+    dcache->drain();
 
-    // deleteCache(ic);
-    // deleteCache(dc);
+    delete icache;
+    delete dcache;
 
     RegisterInfo reg;
     memset(&reg, 0, sizeof(RegisterInfo));

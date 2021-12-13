@@ -253,10 +253,10 @@ Cache::~Cache(){
     cacheData.clear();   
 }
 
-Cache *createCache(CacheConfig config, MemoryStore *mem) {
-    return new Cache(config, mem);
-}
+// Cache *createCache(CacheConfig config, MemoryStore *mem) {
+//     return new Cache(config, mem);
+// }
 
-void deleteCache(Cache *cache) {
-    delete cache;
-}
+// void deleteCache(Cache *cache) {
+//     delete cache;
+// }
