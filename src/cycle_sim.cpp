@@ -819,7 +819,7 @@ CycleStatus runCycle()
         if (nextIdex.instructionData.data.rData.funct == FUN_JR) {
             handleBranchForwarding(nextIdex.instructionData, exmem);
             nextPc = nextIdex.instructionData.data.rData.rsValue;
-            stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, exmem, false);
         } else {
             nextIdex.regToWrite = nextIdex.instructionData.data.rData.rd;
         }
@@ -837,7 +837,7 @@ CycleStatus runCycle()
             {
                 nextPc = ifid.pc + 4 +((static_cast<int32_t>(iData.seImm)) << 2);
             }
-            stallId = branchNeedsStall(nextIdex.instructionData, idex, true);
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, exmem, true);
             break;
         case OP_BNE:
             handleBranchForwarding(nextIdex.instructionData, exmem);
@@ -845,7 +845,7 @@ CycleStatus runCycle()
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
             }
-            stallId = branchNeedsStall(nextIdex.instructionData, idex, true);
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, exmem, true);
             break;
         case OP_BGTZ:
             handleBranchForwarding(nextIdex.instructionData, exmem);
@@ -853,7 +853,7 @@ CycleStatus runCycle()
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
             }
-            stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, exmem, false);
             break;
         case OP_BLEZ:
             handleBranchForwarding(nextIdex.instructionData, exmem);
@@ -861,7 +861,7 @@ CycleStatus runCycle()
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
             }
-            stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, exmem, false);
             break;
         case OP_SB:
         case OP_SH:
