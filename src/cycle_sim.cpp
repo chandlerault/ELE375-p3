@@ -734,7 +734,7 @@ CycleStatus runCycle()
     bool stallMem = false;
 
     // if simulated cache miss time is not over yet
-    if (memHaltCycles-- > 0) {
+    if (--memHaltCycles > 0) {
         pipeState.cycle++;
         simStats.totalCycles++;
         return cycleStatus;
