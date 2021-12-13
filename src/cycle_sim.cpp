@@ -339,7 +339,8 @@ uint8_t getOpcode(uint32_t instr)
 // Return: enum INST_TYPE tag associated with instruction being executed
 enum INST_TYPE getInstType(uint32_t instr)
 {
-    if (instr == 0xfeedfeed) return R;
+    if (instr == 0xfeedfeed)
+        return R;
     uint8_t opcode = getOpcode(instr);
     switch (opcode)
     {
@@ -380,7 +381,8 @@ enum INST_TYPE getInstType(uint32_t instr)
 // Return: struct RData holding relevant register instruction data
 struct RData getRData(uint32_t instr)
 {
-    if (instr == 0xfeedfeed) return RData{};
+    if (instr == 0xfeedfeed)
+        return RData{};
     uint8_t rs = (instr >> 21) & 0x1f;
     uint8_t rt = (instr >> 16) & 0x1f;
     struct RData rData = {
@@ -431,7 +433,8 @@ struct JData getJData(uint32_t instr, uint32_t pc)
     return jData;
 }
 
-enum CycleStatus {
+enum CycleStatus
+{
     NOT_HALTED,
     HALTED
 };
@@ -472,13 +475,13 @@ uint8_t getSign(uint32_t value)
     return (value >> 31) & 0x1;
 }
 
-// returns true if overflow occured, false otherwise 
+// returns true if overflow occured, false otherwise
 // writes the result to result if no overflow occured
 bool doAddSub(uint32_t s1, uint32_t s2, bool isAdd, bool checkOverflow, uint64_t &result)
 {
     bool overflow = false;
 
-    if(isAdd)
+    if (isAdd)
     {
         result = static_cast<int32_t>(s1) + static_cast<int32_t>(s2);
     }
@@ -487,9 +490,9 @@ bool doAddSub(uint32_t s1, uint32_t s2, bool isAdd, bool checkOverflow, uint64_t
         result = static_cast<int32_t>(s1) - static_cast<int32_t>(s2);
     }
 
-    if(checkOverflow)
+    if (checkOverflow)
     {
-        if(isAdd)
+        if (isAdd)
         {
             overflow = getSign(s1) == getSign(s2) && getSign(s2) != getSign(result);
         }
@@ -499,7 +502,7 @@ bool doAddSub(uint32_t s1, uint32_t s2, bool isAdd, bool checkOverflow, uint64_t
         }
     }
 
-    if(overflow)
+    if (overflow)
     {
         //Inform the caller that overflow occurred so it can take appropriate action.
         return true;
@@ -596,7 +599,7 @@ bool handleImmInstEx(IData &iData, uint64_t &rtValue)
     case OP_SH:
     case OP_SW:
         // stores happen in mem stage
-        break; 
+        break;
     }
     return false;
 }
@@ -658,45 +661,56 @@ bool handleMem(EXMEM &exmem)
     return 0;
 }
 
-bool branchNeedsStall(InstructionData &currentInstr, IDEX &nextInstr, EXMEM &nextNextInstr, bool checkRt) {
+bool branchNeedsStall(InstructionData &currentInstr, IDEX &nextInstr, EXMEM &nextNextInstr, bool checkRt)
+{
     auto rs = currentInstr.rs();
     auto rt = currentInstr.rt();
 
-    if(rs == nextNextInstr.regToWrite && nextNextInstr.regToWrite != 0 && nextNextInstr.instructionData.isMemRead()) {
+    if (rs == nextNextInstr.regToWrite && nextNextInstr.regToWrite != 0 && nextNextInstr.instructionData.isMemRead())
+    {
         return true;
     }
 
-    if(checkRt && rt == nextNextInstr.regToWrite && nextNextInstr.regToWrite != 0 && nextNextInstr.instructionData.isMemRead()) {
-        return true;
-    }
-    
-    if (rs == nextInstr.regToWrite && nextInstr.regToWrite != 0) {
+    if (checkRt && rt == nextNextInstr.regToWrite && nextNextInstr.regToWrite != 0 && nextNextInstr.instructionData.isMemRead())
+    {
         return true;
     }
 
-    if (checkRt && rt == nextInstr.regToWrite && nextInstr.regToWrite != 0) {
+    if (rs == nextInstr.regToWrite && nextInstr.regToWrite != 0)
+    {
+        return true;
+    }
+
+    if (checkRt && rt == nextInstr.regToWrite && nextInstr.regToWrite != 0)
+    {
         return true;
     }
 
     return false;
 }
 
-void handleBranchForwarding(InstructionData &instr, EXMEM &exmem) {
-    if (instr.rs() == exmem.regToWrite && exmem.regToWrite != 0 && exmem.regWriteValue != UINT64_MAX) {
+void handleBranchForwarding(InstructionData &instr, EXMEM &exmem)
+{
+    if (instr.rs() == exmem.regToWrite && exmem.regToWrite != 0 && exmem.regWriteValue != UINT64_MAX)
+    {
         instr.rsValue(exmem.regWriteValue);
     }
-    else if (instr.rt() == exmem.regToWrite && exmem.regToWrite != 0 && exmem.regWriteValue != UINT64_MAX) {
+    else if (instr.rt() == exmem.regToWrite && exmem.regToWrite != 0 && exmem.regWriteValue != UINT64_MAX)
+    {
         instr.rtValue(exmem.regWriteValue);
     }
 }
 
-void handleMemForwarding(InstructionData &instr, MEMWB &memwb) {
-    if (instr.rt() == memwb.regToWrite && memwb.regToWrite != 0 && memwb.regWriteValue != UINT64_MAX) {
+void handleMemForwarding(InstructionData &instr, MEMWB &memwb)
+{
+    if (instr.rt() == memwb.regToWrite && memwb.regToWrite != 0 && memwb.regWriteValue != UINT64_MAX)
+    {
         instr.rtValue(memwb.regWriteValue);
     }
 }
 
-bool isFuncCodeValid(uint8_t funct){
+bool isFuncCodeValid(uint8_t funct)
+{
     switch (funct)
     {
     case FUN_ADD:
@@ -717,7 +731,6 @@ bool isFuncCodeValid(uint8_t funct){
     }
 }
 
-
 CycleStatus runCycle()
 {
     IFID nextIfid{};
@@ -730,26 +743,29 @@ CycleStatus runCycle()
     bool stallMem = false;
 
     // writeBack
-    // first as we're emulating writing to register file 
-    // happening before reading to it 
+    // first as we're emulating writing to register file
+    // happening before reading to it
     if (memwb.regWriteValue != UINT64_MAX && memwb.regToWrite != 0)
     {
         regs[memwb.regToWrite] = memwb.regWriteValue;
     }
 
     // instructionFetch
-    uint32_t instruction;
-    
-    if (icache->getCacheValue(pc, instruction, MemEntrySize::WORD_SIZE, pipeState.cycle))
+    uint32_t instruction = 0;
+
+    if (!haltSeen)
     {
-        stallIf = true;
+        if (icache->getCacheValue(pc, instruction, MemEntrySize::WORD_SIZE, pipeState.cycle))
+        {
+            stallIf = true;
+        }
     }
-    instruction = haltSeen ? 0 : instruction;
 
     nextIfid.pc = pc;
     uint32_t nextPc = pc + 4;
     nextIfid.instruction = instruction;
-    if (instruction == 0xfeedfeed) haltSeen = true;
+    if (instruction == 0xfeedfeed)
+        haltSeen = true;
 
     // instructionDecode
     nextIdex.instructionData.tag = getInstType(ifid.instruction);
@@ -760,18 +776,22 @@ CycleStatus runCycle()
         nextIdex.instructionData.data.rData = getRData(ifid.instruction);
 
         // Illegal instruction exception check
-        if (!isFuncCodeValid(nextIdex.instructionData.data.rData.funct)){
+        if (!isFuncCodeValid(nextIdex.instructionData.data.rData.funct))
+        {
             nextPc = EXCEPTION_ADDR;
             nextIfid.instruction = 0;
             haltSeen = false;
             nextIdex.instructionData = InstructionData{};
             break;
         }
-        if (nextIdex.instructionData.data.rData.funct == FUN_JR) {
+        if (nextIdex.instructionData.data.rData.funct == FUN_JR)
+        {
             handleBranchForwarding(nextIdex.instructionData, exmem);
             nextPc = nextIdex.instructionData.data.rData.rsValue;
             stallId = branchNeedsStall(nextIdex.instructionData, idex, exmem, false);
-        } else {
+        }
+        else
+        {
             nextIdex.regToWrite = nextIdex.instructionData.data.rData.rd;
         }
         break;
@@ -786,7 +806,7 @@ CycleStatus runCycle()
             handleBranchForwarding(nextIdex.instructionData, exmem);
             if (iData.rsValue == iData.rtValue)
             {
-                nextPc = ifid.pc + 4 +((static_cast<int32_t>(iData.seImm)) << 2);
+                nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
             }
             stallId = branchNeedsStall(nextIdex.instructionData, idex, exmem, true);
             break;
@@ -846,7 +866,8 @@ CycleStatus runCycle()
         haltSeen = false;
         nextIdex = IDEX{};
     }
-    if (nextIdex.instructionData.tag != E) nextIdex.instruction = ifid.instruction;
+    if (nextIdex.instructionData.tag != E)
+        nextIdex.instruction = ifid.instruction;
 
     // if (ID/EX.MemRead and
     //  ((ID/EX.RegisterRt = IF/ID.RegisterRs) or
@@ -898,13 +919,14 @@ CycleStatus runCycle()
     case I:
         exOverflow = handleImmInstEx(idex.instructionData.data.iData, nextExmem.regWriteValue);
         break;
-   default:
+    default:
     {
         break;
     }
     }
 
-    if (exOverflow) {
+    if (exOverflow)
+    {
         nextPc = EXCEPTION_ADDR;
         nextIfid.instruction = 0;
         nextIdex = IDEX{};
@@ -913,18 +935,20 @@ CycleStatus runCycle()
     }
 
     // mem
-    if (exmem.instructionData.tag == I) {
+    if (exmem.instructionData.tag == I)
+    {
         handleMemForwarding(exmem.instructionData, memwb);
-        if (handleMem(exmem)) stallMem = true;
+        if (handleMem(exmem))
+            stallMem = true;
     }
 
     nextMemwb = exmem;
 
-    
     // writeback trigger halt
-    if (memwb.instruction == 0xfeedfeed) cycleStatus = HALTED;
+    if (memwb.instruction == 0xfeedfeed)
+        cycleStatus = HALTED;
 
-     // update pipe state information
+    // update pipe state information
     pipeState.cycle++;
     pipeState.ifInstr = nextIfid.instruction;
     pipeState.idInstr = nextIdex.instruction;
@@ -936,27 +960,35 @@ CycleStatus runCycle()
     simStats.totalCycles++;
 
     // finish cycle
-    if (!stallIf && !stallId && !stallMem) {
+    if (!stallIf && !stallId && !stallMem)
+    {
         ifid = nextIfid;
         pc = nextPc;
     }
 
-    if (stallIf) {
+    if (stallIf)
+    {
         // insert bubble
         ifid = IFID{};
     }
 
-    if (!stallId && !stallMem) {
+    if (!stallId && !stallMem)
+    {
         idex = nextIdex;
-    } else if (stallId && !stallMem) {
+    }
+    else if (stallId && !stallMem)
+    {
         // insert bubble
         idex = IDEX{};
     }
 
-    if (!stallMem) {
+    if (!stallMem)
+    {
         exmem = nextExmem;
         memwb = nextMemwb;
-    } else {
+    }
+    else
+    {
         // insert bubble
         memwb = MEMWB{};
     }
@@ -964,9 +996,11 @@ CycleStatus runCycle()
     return cycleStatus;
 }
 
-int runCycles(unsigned int cycles) {
+int runCycles(unsigned int cycles)
+{
     CycleStatus cycleStatus{};
-    for(; cycles > 0 && cycleStatus != HALTED; cycles--) {
+    for (; cycles > 0 && cycleStatus != HALTED; cycles--)
+    {
         cycleStatus = runCycle();
     }
     pipeState.cycle--;
@@ -974,17 +1008,20 @@ int runCycles(unsigned int cycles) {
     pipeState.cycle++;
     return cycleStatus == HALTED;
 }
-int runTillHalt() {
+int runTillHalt()
+{
     CycleStatus cycleStatus{};
-    do {
+    do
+    {
         cycleStatus = runCycle();
-    } while(cycleStatus != HALTED);
+    } while (cycleStatus != HALTED);
     pipeState.cycle--;
     dumpPipeState(pipeState);
     pipeState.cycle++;
     return 0;
-}          
-int finalizeSimulator() {
+}
+int finalizeSimulator()
+{
     // Set the register values in the struct for printing...
     SimulationStats s;
     s.totalCycles = pipeState.cycle;
@@ -1008,4 +1045,4 @@ int finalizeSimulator() {
     dumpMemoryState(memStore);
 
     return 0;
-}  
+}
