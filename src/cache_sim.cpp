@@ -67,24 +67,24 @@ Cache::Cache(CacheConfig &config, MemoryStore *mem) {
 
  // address given is the address of the first byte
 int Cache::getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, uint32_t cycle){
-    int miss;
+    CacheByteResult result;
     value = 0;
 
     // look at each byte  
     for(uint32_t i = 0; i< size; i++){
         uint32_t byteAddr = address+i;
         uint32_t byte;
-        miss = getCacheByte(byteAddr, byte, cycle);
-        if(i ==0){
-            if(miss == 0) {
+        result = getCacheByte(byteAddr, byte, cycle);
+        if(i ==0 && result.countHitMiss){
+            if(result.available) {
                 hits++;
-            } else if (miss == 2) {
+            } else {
                 misses++;
             }
         }
         value = value | (byte << ((size-1-i)*8));
     }
-    return miss;
+    return !result.available;
 }
 
     // cache read miss procedure:
@@ -102,28 +102,23 @@ int Cache::getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, 
 
 int Cache::setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, uint32_t cycle) {
     uint32_t mask = 0xFF;
-    uint32_t latency = 0;
-    int miss;
+    CacheByteResult result;
     for (uint32_t i = 0; i < size; i++) {
         uint32_t byte = (value & (mask << ((size-1-i)*8))) >> ((size-1-i)*8);
         //uint32_t byte;
-        miss = setCacheByte(address + i, byte, cycle);
-        if(i ==0){
-            if(miss == 0) {
+        result = setCacheByte(address + i, byte, cycle);
+        if(i ==0 && result.countHitMiss){
+            if(result.available) {
                 hits++;
-            } else if (miss == 2) {
+            } else {
                 misses++;
             }
         }
-         if (miss) { 
-            latency = missLatency;
-        }
     }
-    return latency;
+    return !result.available;
 }
 
-// returns 0 on hit, 1 on simulated miss, 2 on actual miss
-int Cache::getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle){
+CacheByteResult Cache::getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle){
     uint32_t addressCopy = address;
     uint32_t addrTag = addressCopy << (ADDRESS_LEN - tagEnd) >> (ADDRESS_LEN-tagEnd) >> (tagStart);
     addressCopy = address;
@@ -135,23 +130,22 @@ int Cache::getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle){
        for (uint32_t i = 0; i< assoc; i++) {
         // read Hit
         if(metaDataBits[addrIndex][i].valid  && metaDataBits[addrIndex][i].tag == addrTag) {
-            if (metaDataBits[addrIndex][i].cycleReady > cycle) return 1;
+            if (metaDataBits[addrIndex][i].cycleReady > cycle) return CacheByteResult{false, false};
             value = cacheData[addrIndex][i][blockOffset];
             updateLRU(addrIndex, i);
             // helper function to keep track of LRU block for each set in cache
            // updateLRU();
-            return 0;
+            return CacheByteResult{true, metaDataBits[addrIndex][i].cycleReady < cycle};
         } 
     }
     // gets data from memory after a cache miss 
     uint32_t newBlock = cacheMiss(addressCopy, addrTag, addrIndex, blockOffset);
     value = cacheData[addrIndex][newBlock][blockOffset];
     metaDataBits[addrIndex][newBlock].cycleReady = cycle + missLatency;
-    return 2;
+    return CacheByteResult{false, true};
 }
 
-// returns 0 on hit, 1 on simulated miss, 2 on actual miss
-int Cache::setCacheByte(uint32_t address, uint32_t value, uint32_t cycle) {
+CacheByteResult Cache::setCacheByte(uint32_t address, uint32_t value, uint32_t cycle) {
     uint32_t addressCopy = address;
     uint32_t addrTag = (ADDRESS_LEN - tagEnd) >> (ADDRESS_LEN-tagEnd) >> (tagStart);
     addressCopy = address;
@@ -163,12 +157,12 @@ int Cache::setCacheByte(uint32_t address, uint32_t value, uint32_t cycle) {
     for (uint32_t i = 0; i < assoc; i++) {
         if (metaDataBits[addrIndex][i].valid  && metaDataBits[addrIndex][i].tag == addrTag) { // WRITE HIT
             if (metaDataBits[addrIndex][i].cycleReady > cycle) {
-                return 1; // we've hit before, but are emulating latency 
+                return CacheByteResult{false, false}; // we've hit before, but are emulating latency 
             }
             cacheData[addrIndex][i][blockOffset] = (uint8_t) value;
             metaDataBits[addrIndex][i].dirty = 1;
             updateLRU(addrIndex, i);
-            return 0;
+            return CacheByteResult{true, metaDataBits[addrIndex][i].cycleReady < cycle};
         }
     }
 
@@ -177,7 +171,7 @@ int Cache::setCacheByte(uint32_t address, uint32_t value, uint32_t cycle) {
     cacheData[addrIndex][newBlock][blockOffset] = (uint8_t) value;
     metaDataBits[addrIndex][newBlock].dirty = 1;
     metaDataBits[addrIndex][newBlock].cycleReady = cycle + missLatency;
-    return 2;
+    return CacheByteResult{false,true};
 }
 
 uint32_t Cache::cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, uint32_t blockOffset) {
