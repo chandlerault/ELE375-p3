@@ -8,6 +8,8 @@
 #include "EndianHelpers.h"
 #include "DriverFunctions.h"
 
+// #include "cache_sim.h"
+
 #define EXCEPTION_ADDR 0x8000
 using namespace std;
 //TODO: Fix the error messages to output the correct PC in case of errors.
@@ -552,7 +554,9 @@ SimulationStats simStats{};
 int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mainMem)
 {
     icache = Cache{};
+    //createCache(icConfig, mainMem);
     dcache = Cache{};
+    //createCache(dcConfig, mainMem);
     pipeState = PipeState{};
     pc = 0;
     memStore = mainMem;
@@ -655,12 +659,6 @@ uint64_t handleImmInstEx(IData &iData)
     return rtValue;
 }
 
-void handleJInstEx(JData &jData)
-{
-    // TODO: is this needed? what to do for jal
-    return;
-}
-
 // returns non zero when stall
 int handleMem(EXMEM &exmem)
 {
@@ -721,14 +719,23 @@ int handleMem(EXMEM &exmem)
     return 0;
 }
 
-bool branchNeedsStall(InstructionData &currentInstr, IDEX &nextInstr, bool checkRt) {
-    // TODO: check for mem op
-    
-    if (currentInstr.rs() == nextInstr.regToWrite && nextInstr.regToWrite != 0) {
+bool branchNeedsStall(InstructionData &currentInstr, IDEX &nextInstr, EXMEM &nextNextInstr, bool checkRt) {
+    auto rs = currentInstr.rs();
+    auto rt = currentInstr.rt();
+
+    if(rs == nextNextInstr.regToWrite && nextNextInstr.regToWrite != 0 && nextNextInstr.instructionData.isMemRead()) {
         return true;
     }
 
-    if (checkRt && currentInstr.rt() == nextInstr.regToWrite && nextInstr.regToWrite != 0) {
+    if(checkRt && rt == nextNextInstr.regToWrite && nextNextInstr.regToWrite != 0 && nextNextInstr.instructionData.isMemRead()) {
+        return true;
+    }
+    
+    if (rs == nextInstr.regToWrite && nextInstr.regToWrite != 0) {
+        return true;
+    }
+
+    if (checkRt && rt == nextInstr.regToWrite && nextInstr.regToWrite != 0) {
         return true;
     }
 
@@ -743,6 +750,13 @@ void handleBranchForwarding(InstructionData &instr, EXMEM &exmem) {
         instr.rtValue(exmem.regWriteValue);
     }
 }
+
+void handleMemForwarding(InstructionData &instr, MEMWB &memwb) {
+    if (instr.rt() == memwb.regToWrite && memwb.regToWrite != 0 && memwb.regWriteValue != UINT64_MAX) {
+        instr.rtValue(memwb.regWriteValue);
+    }
+}
+
 /*
 int checkFunction(uint8_t funct){
     switch (funct)
@@ -814,7 +828,7 @@ CycleStatus runCycle()
         if (nextIdex.instructionData.data.rData.funct == FUN_JR) {
             handleBranchForwarding(nextIdex.instructionData, exmem);
             nextPc = nextIdex.instructionData.data.rData.rsValue;
-            stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, exmem, false);
         } else {
             nextIdex.regToWrite = nextIdex.instructionData.data.rData.rd;
         }
@@ -832,7 +846,7 @@ CycleStatus runCycle()
             {
                 nextPc = ifid.pc + 4 +((static_cast<int32_t>(iData.seImm)) << 2);
             }
-            stallId = branchNeedsStall(nextIdex.instructionData, idex, true);
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, exmem, true);
             break;
         case OP_BNE:
             handleBranchForwarding(nextIdex.instructionData, exmem);
@@ -840,7 +854,7 @@ CycleStatus runCycle()
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
             }
-            stallId = branchNeedsStall(nextIdex.instructionData, idex, true);
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, exmem, true);
             break;
         case OP_BGTZ:
             handleBranchForwarding(nextIdex.instructionData, exmem);
@@ -848,7 +862,7 @@ CycleStatus runCycle()
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
             }
-            stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, exmem, false);
             break;
         case OP_BLEZ:
             handleBranchForwarding(nextIdex.instructionData, exmem);
@@ -856,7 +870,7 @@ CycleStatus runCycle()
             {
                 nextPc = ifid.pc + 4 + ((static_cast<int32_t>(iData.seImm)) << 2);
             }
-            stallId = branchNeedsStall(nextIdex.instructionData, idex, false);
+            stallId = branchNeedsStall(nextIdex.instructionData, idex, exmem, false);
             break;
         case OP_SB:
         case OP_SH:
@@ -942,13 +956,13 @@ CycleStatus runCycle()
         break;
     case J:
     {
-        handleJInstEx(idex.instructionData.data.jData);
         break;
     }
     }
 
     // mem
     if (exmem.instructionData.tag == I) {
+        handleMemForwarding(exmem.instructionData, memwb);
         // TODO: handle stalls
         handleMem(exmem);
     }
