@@ -987,6 +987,7 @@ int runTillHalt() {
 int finalizeSimulator() {
     // Set the register values in the struct for printing...
     SimulationStats s;
+    s.totalCycles = pipeState.cycle;
     s.icHits = icache->getHits();
     s.icMisses = icache->getMisses();
     s.dcHits = dcache->getHits();

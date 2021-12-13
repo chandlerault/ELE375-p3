@@ -78,7 +78,7 @@ int Cache::getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, 
         if(i ==0){
             if(miss == 0) {
                 hits++;
-            } else {
+            } else if (miss == 2) {
                 misses++;
             }
         }
@@ -111,7 +111,7 @@ int Cache::setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, ui
         if(i ==0){
             if(miss == 0) {
                 hits++;
-            } else {
+            } else if (miss == 2) {
                 misses++;
             }
         }
@@ -122,6 +122,7 @@ int Cache::setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, ui
     return latency;
 }
 
+// returns 0 on hit, 1 on simulated miss, 2 on actual miss
 int Cache::getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle){
     uint32_t addressCopy = address;
     uint32_t addrTag = addressCopy << (ADDRESS_LEN - tagEnd) >> (ADDRESS_LEN-tagEnd) >> (tagStart);
@@ -146,9 +147,10 @@ int Cache::getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle){
     uint32_t newBlock = cacheMiss(addressCopy, addrTag, addrIndex, blockOffset);
     value = cacheData[addrIndex][newBlock][blockOffset];
     metaDataBits[addrIndex][newBlock].cycleReady = cycle + missLatency;
-    return 1;
+    return 2;
 }
 
+// returns 0 on hit, 1 on simulated miss, 2 on actual miss
 int Cache::setCacheByte(uint32_t address, uint32_t value, uint32_t cycle) {
     uint32_t addressCopy = address;
     uint32_t addrTag = (ADDRESS_LEN - tagEnd) >> (ADDRESS_LEN-tagEnd) >> (tagStart);
@@ -175,7 +177,7 @@ int Cache::setCacheByte(uint32_t address, uint32_t value, uint32_t cycle) {
     cacheData[addrIndex][newBlock][blockOffset] = (uint8_t) value;
     metaDataBits[addrIndex][newBlock].dirty = 1;
     metaDataBits[addrIndex][newBlock].cycleReady = cycle + missLatency;
-    return 1;
+    return 2;
 }
 
 uint32_t Cache::cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, uint32_t blockOffset) {
