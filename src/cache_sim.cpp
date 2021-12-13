@@ -80,6 +80,7 @@ int Cache::getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, 
                 hits++;
             } else {
                 misses++;
+                hits--;
             }
         }
         value = value | (byte << ((size-1-i)*8));
@@ -112,6 +113,7 @@ int Cache::setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, ui
                 hits++;
             } else {
                 misses++;
+                hits--;
             }
         }
     }
