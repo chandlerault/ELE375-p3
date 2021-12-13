@@ -274,6 +274,7 @@ struct InstructionData
             this->data.iData.rsValue = val;
             break;
         case J:
+        case E:
             break;
         }
     }
@@ -289,6 +290,7 @@ struct InstructionData
             this->data.iData.rtValue = val;
             break;
         case J:
+        case E:
             break;
         }
     }
@@ -848,7 +850,7 @@ CycleStatus runCycle()
     case I:
         nextExmem.regWriteValue = handleImmInstEx(idex.instructionData.data.iData);
         break;
-    case J:
+   default:
     {
         break;
     }
