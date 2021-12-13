@@ -11,11 +11,6 @@ struct metaData {
     uint32_t cycleReady;
 };
 
-struct CacheByteResult {
-    bool available;
-    bool countHitMiss;
-};
-
 class Cache {
     private:
         //vector<uint32_t> tags;
@@ -38,8 +33,8 @@ class Cache {
         uint32_t numBlocks, numSets, blockSize, cacheSize, missLatency, assoc;
         int offsetStart, offsetEnd, indexStart, indexEnd, tagStart, tagEnd;
         // funcitons to set valid bit, lru, dirty, 
-        CacheByteResult setCacheByte(uint32_t address, uint32_t value, uint32_t cycle);
-        CacheByteResult getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle);
+        int setCacheByte(uint32_t address, uint32_t value, uint32_t cycle);
+        int getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle);
         void updateLRU(int addrIndex, int recentlyUsed);
         MemoryStore *mainMem;
     public:

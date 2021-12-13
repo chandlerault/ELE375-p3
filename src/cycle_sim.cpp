@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <fstream>
 #include <string.h>
+#include <algorithm.h>
 #include <errno.h>
 #include "MemoryStore.h"
 #include "RegisterInfo.h"
@@ -449,6 +450,7 @@ IDEX idex;
 EXMEM exmem;
 MEMWB memwb;
 bool haltSeen;
+int memHaltCycles;
 CycleStatus cycleStatus{};
 SimulationStats simStats{};
 
@@ -465,6 +467,7 @@ int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mai
     exmem = EXMEM{};
     memwb = MEMWB{};
     haltSeen = false;
+    memHaltCycles = 0;
     cycleStatus = CycleStatus{};
     simStats = SimulationStats{};
     return 0;
@@ -610,49 +613,37 @@ bool handleMem(EXMEM &exmem)
     IData &iData = exmem.instructionData.data.iData;
     uint32_t addr = iData.rsValue + iData.seImm;
     uint32_t data = 0;
-    // TODO: perform operations through cache
-    // and overall clean this up
+    
+    int delay = 0;
     switch (iData.opcode)
     {
     case OP_SB:
-        if (dcache->setCacheValue(addr, iData.rtValue, BYTE_SIZE, pipeState.cycle))
-        {
-            return true;
-        }
-        break;
+        return dcache->setCacheValue(addr, iData.rtValue, BYTE_SIZE, pipeState.cycle;
     case OP_SH:
-        if (dcache->setCacheValue(addr, iData.rtValue, HALF_SIZE, pipeState.cycle))
-        {
-            return true;
-        }
-        break;
+        return dcache->setCacheValue(addr, iData.rtValue, HALF_SIZE, pipeState.cycle);
     case OP_SW:
-        if (dcache->setCacheValue(addr, iData.rtValue, WORD_SIZE, pipeState.cycle))
-        {
-            return true;
-        }
-        break;
+        return dcache->setCacheValue(addr, iData.rtValue, WORD_SIZE, pipeState.cycle);
     case OP_LBU:
-        if (dcache->getCacheValue(addr, data, BYTE_SIZE, pipeState.cycle))
+        if (delay = dcache->getCacheValue(addr, data, BYTE_SIZE, pipeState.cycle))
         {
-            return true;
+            return delay;
         }
         else
             exmem.regWriteValue = data;
         break;
     case OP_LHU:
-        if (dcache->getCacheValue(addr, data, HALF_SIZE, pipeState.cycle))
+        if (delay = dcache->getCacheValue(addr, data, HALF_SIZE, pipeState.cycle))
         {
 
-            return true;
+            return delay;
         }
         else
             exmem.regWriteValue = data;
         break;
     case OP_LW:
-        if (dcache->getCacheValue(addr, data, WORD_SIZE, pipeState.cycle))
+        if (delay = dcache->getCacheValue(addr, data, WORD_SIZE, pipeState.cycle))
         {
-            return true;
+            return delay;
         }
         else
             exmem.regWriteValue = data;
@@ -742,6 +733,14 @@ CycleStatus runCycle()
     bool stallId = false;
     bool stallMem = false;
 
+    // if simulated cache miss time is not over yet
+    if (memHaltCycles-- > 0) {
+        pipeState.cycle++;
+        simStats.totalCycles++;
+        return cycleStatus;
+    }
+    else memHaltCycles = 0;
+
     // writeBack
     // first as we're emulating writing to register file
     // happening before reading to it
@@ -755,9 +754,11 @@ CycleStatus runCycle()
 
     if (!haltSeen)
     {
-        if (icache->getCacheValue(pc, instruction, MemEntrySize::WORD_SIZE, pipeState.cycle))
+        auto delay = icache->getCacheValue(pc, instruction, MemEntrySize::WORD_SIZE, pipeState.cycle);
+        if (delay)
         {
             stallIf = true;
+            memHaltCycles = std:max(memHaltCycles, delay);
         }
     }
 
@@ -938,8 +939,11 @@ CycleStatus runCycle()
     if (exmem.instructionData.tag == I)
     {
         handleMemForwarding(exmem.instructionData, memwb);
-        if (handleMem(exmem))
+        auto delay = handleMem(exmem);
+        if (delay) {
+            memHaltCycles = std::max(memHaltCycles, delay);
             stallMem = true;
+        }
     }
 
     nextMemwb = exmem;
@@ -947,6 +951,7 @@ CycleStatus runCycle()
     // writeback trigger halt
     if (memwb.instruction == 0xfeedfeed)
         cycleStatus = HALTED;
+
 
     // update pipe state information
     pipeState.cycle++;
