@@ -560,17 +560,18 @@ bool handleRInstEx(RData &rData, uint64_t &rdValue)
     return false;
 }
 
-// returns new value of rt destination, or UINT64_MAX if no new value
-uint64_t handleImmInstEx(IData &iData)
+// sets rtValue to new value of rt destination, or UINT64_MAX if no new value
+// returns true if overflow detected, false otherwise
+bool handleImmInstEx(IData &iData, uint64_t &rtValue)
 {
-    uint64_t rtValue = UINT64_MAX;
+    rtValue = UINT64_MAX;
 
     switch (iData.opcode)
     {
     case OP_ADDI:
+        return doAddSub(iData.rsValue, iData.seImm, true, true, rtValue);
     case OP_ADDIU:
-        rtValue = iData.rsValue + iData.seImm;
-        break;
+        return doAddSub(iData.rsValue, iData.seImm, true, false, rtValue);
     case OP_ANDI:
         rtValue = iData.rsValue & iData.zeImm;
         break;
@@ -595,9 +596,9 @@ uint64_t handleImmInstEx(IData &iData)
     case OP_SH:
     case OP_SW:
         // stores happen in mem stage
-        break;
+        break; 
     }
-    return rtValue;
+    return false;
 }
 
 // returns true when stall, false otherwise
@@ -887,25 +888,28 @@ CycleStatus runCycle()
 
     nextExmem = idex;
 
+    bool exOverflow = false;
+
     switch (idex.instructionData.tag)
     {
     case R:
-        if (handleRInstEx(idex.instructionData.data.rData, nextExmem.regWriteValue)) {
-            // overflow occured
-            nextPc = EXCEPTION_ADDR;
-            nextIfid.instruction = 0;
-            nextIdex = IDEX{};
-            nextExmem = EXMEM{};
-            haltSeen = false;
-        }
+        exOverflow = handleRInstEx(idex.instructionData.data.rData, nextExmem.regWriteValue);
         break;
     case I:
-        nextExmem.regWriteValue = handleImmInstEx(idex.instructionData.data.iData);
+        exOverflow = handleImmInstEx(idex.instructionData.data.iData, nextExmem.regWriteValue);
         break;
    default:
     {
         break;
     }
+    }
+
+    if (exOverflow) {
+        nextPc = EXCEPTION_ADDR;
+        nextIfid.instruction = 0;
+        nextIdex = IDEX{};
+        nextExmem = EXMEM{};
+        haltSeen = false;
     }
 
     // mem
