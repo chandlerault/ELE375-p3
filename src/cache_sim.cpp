@@ -104,7 +104,7 @@ int Cache::setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, ui
     bool miss;
     for (int i = 0; i < size; i++) {
         uint32_t byte = (value & (mask << ((size-1-i)*8))) >> ((size-1-i)*8);
-        uint32_t byte;
+        //uint32_t byte;
         miss = setCacheByte(address + i, byte, cycle);
         if(i ==0){
             if(miss == 0) {
