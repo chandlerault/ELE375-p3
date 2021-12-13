@@ -8,7 +8,7 @@
 #include "EndianHelpers.h"
 #include "DriverFunctions.h"
 
-// #include "cache_sim.h"
+#include "cache_sim.h"
 
 #define EXCEPTION_ADDR 0x8000
 using namespace std;
@@ -327,107 +327,6 @@ using EXMEM = IDEX;
 
 using MEMWB = EXMEM;
 
-struct Cache
-{
-    // CACHE_VALUE type;
-};
-
-// returns UINT64_MAX if result is not available in the cache yet, the value at the address otherwise
-uint64_t getCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t addr, MemEntrySize size)
-{
-    uint32_t value = 0;
-    int ret = mem->getMemValue(addr, value, size);
-
-    /*// cache miss and hit logic for loads
-    if (cache.type == ICACHE){
-        if (value == UINT64_MAX) simStats.icMisses++;
-        else simStats.icHits++;
-    } 
-    else {
-        if (value == UINT64_MAX) simStats.dcMisses++;
-        else simStats.dcHits++;
-    }
-    */
-
-    if (ret)
-    {
-        cout << "Could not get mem value" << endl;
-        exit(1);
-    }
-
-    switch (size)
-    {
-    case BYTE_SIZE:
-        return value & 0xFF;
-        break;
-    case HALF_SIZE:
-        return value & 0xFFFF;
-        break;
-    case WORD_SIZE:
-        return value;
-        break;
-    default:
-        cerr << "Invalid size passed, cannot read/write memory" << endl;
-        exit(1);
-    }
-}
-
-// returns true if value ready, false otherwise
-bool setCacheValue(Cache *cache, MemoryStore *mem, uint64_t cycle, uint32_t addr, MemEntrySize size, uint32_t value)
-{
-    int ret;
-    switch (size)
-    {
-    case BYTE_SIZE:
-        ret = mem->setMemValue(addr, value & 0xFF, BYTE_SIZE);
-        /*// cache miss and hit logic for store
-        if (cache.type == ICACHE){
-            if (ret) simStats.icHits++;
-            else simStats.icMisses++;
-        } 
-        else {
-            if (ret) simStats.dcHits++;
-            else simStats.dcMisses++;
-        }
-        */
-        break;
-    case HALF_SIZE:
-        ret = mem->setMemValue(addr, value & 0xFFFF, HALF_SIZE);
-        /*// cache miss and hit logic for store
-        if (cache.type == ICACHE){
-            if (ret) simStats.icHits++;
-            else simStats.icMisses++;
-        } 
-        else {
-            if (ret) simStats.dcHits++;
-            else simStats.dcMisses++;
-        }
-        */
-        break;
-    case WORD_SIZE:
-        ret = mem->setMemValue(addr, value, WORD_SIZE);
-        /*// cache miss and hit logic for store
-        if (cache.type == ICACHE){
-            if (ret) simStats.icHits++;
-            else simStats.icMisses++;
-        } 
-        else {
-            if (ret) simStats.dcHits++;
-            else simStats.dcMisses++;
-        }
-        */
-        break;
-    default:
-        cerr << "Unknown mem write word size provided.\n";
-        exit(1);
-    }
-    if (ret)
-    {
-        cerr << "Failed to write to memory address 0x" << std::hex << std::setw(8) << std::setfill('0') << addr << endl;
-    }
-    return true;
-}
-
 // get opcode from instruction
 uint8_t getOpcode(uint32_t instr)
 {
@@ -553,9 +452,9 @@ SimulationStats simStats{};
 
 int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mainMem)
 {
-    icache = Cache{};
+    icache = Cache{icConfig, mainMem};
     //createCache(icConfig, mainMem);
-    dcache = Cache{};
+    dcache = Cache{dcConfig, mainMem};
     //createCache(dcConfig, mainMem);
     pipeState = PipeState{};
     pc = 0;
@@ -659,8 +558,8 @@ uint64_t handleImmInstEx(IData &iData)
     return rtValue;
 }
 
-// returns non zero when stall
-int handleMem(EXMEM &exmem)
+// returns true when stall, false otherwise
+bool handleMem(EXMEM &exmem)
 {
     IData &iData = exmem.instructionData.data.iData;
     uint32_t addr = iData.rsValue + iData.seImm;
@@ -670,47 +569,47 @@ int handleMem(EXMEM &exmem)
     switch (iData.opcode)
     {
     case OP_SB:
-        if (setCacheValue(&dcache, memStore, pipeState.cycle, addr, BYTE_SIZE, iData.rtValue))
+        if (dcache.setCacheValue(addr, iData.rtValue, BYTE_SIZE, pipeState.cycle))
         {
-            // TODO: stall
+            return true;
         }
         break;
     case OP_SH:
-        if (setCacheValue(&dcache, memStore, pipeState.cycle, addr, HALF_SIZE, iData.rtValue))
+        if (dcache.setCacheValue(addr, iData.rtValue, HALF_SIZE, pipeState.cycle))
         {
-            // TODO: stall
+            return true;
         }
         break;
     case OP_SW:
-        if (setCacheValue(&dcache, memStore, pipeState.cycle, addr, WORD_SIZE, iData.rtValue))
+        if (dcache.setCacheValue(addr, iData.rtValue, WORD_SIZE, pipeState.cycle))
         {
-            // TODO: stall
+            return true;
         }
         break;
     case OP_LBU:
-        data = getCacheValue(&dcache, memStore, pipeState.cycle, addr, BYTE_SIZE);
+        dcache.getCacheValue(addr, data, BYTE_SIZE, pipeState.cycle);
         if (data == UINT64_MAX)
         {
-            // TODO stall
+            return true;
         }
         else
             exmem.regWriteValue = data;
         break;
     case OP_LHU:
-        data = getCacheValue(&dcache, memStore, pipeState.cycle, addr, HALF_SIZE);
+        dcache.getCacheValue(addr, data, HALF_SIZE, pipeState.cycle);
         if (data == UINT64_MAX)
         {
 
-            // TODO stall
+            return true;
         }
         else
             exmem.regWriteValue = data;
         break;
     case OP_LW:
-        data = getCacheValue(&dcache, memStore, pipeState.cycle, addr, WORD_SIZE);
+        dcache.getCacheValue(addr, data, WORD_SIZE, pipeState.cycle);
         if (data == UINT64_MAX)
         {
-            // TODO stall
+            return true;
         }
         else
             exmem.regWriteValue = data;
@@ -790,6 +689,7 @@ CycleStatus runCycle()
 
     bool stallIf = false;
     bool stallId = false;
+    bool stallMem = false;
 
     // writeBack
     // first as we're emulating writing to register file 
@@ -800,7 +700,9 @@ CycleStatus runCycle()
     }
 
     // instructionFetch
-    auto instruction = haltSeen ? 0 : getCacheValue(&icache, memStore, pipeState.cycle, pc, MemEntrySize::WORD_SIZE);
+    uint32_t instruction;
+    icache.getCacheValue(pc, instruction, MemEntrySize::WORD_SIZE, pipeState.cycle);
+    instruction = haltSeen ? 0 : instruction;
     if (instruction == UINT64_MAX)
     {
         stallIf = true;
@@ -963,8 +865,7 @@ CycleStatus runCycle()
     // mem
     if (exmem.instructionData.tag == I) {
         handleMemForwarding(exmem.instructionData, memwb);
-        // TODO: handle stalls
-        handleMem(exmem);
+        if (handleMem(exmem)) stallMem = true;
     }
 
     nextMemwb = exmem;
@@ -984,18 +885,23 @@ CycleStatus runCycle()
     // update total cycles
     simStats.totalCycles++;
 
-
     // finish cycle
-    if (!stallIf && !stallId) {
+    if (!stallIf && !stallId && !stallMem) {
         ifid = nextIfid;
         pc = nextPc;
     }
-    
-    // if stalling id stage, enter bubble to execute next
-    idex = stallId ? IDEX{} : nextIdex;
 
-    exmem = nextExmem;
-    memwb = nextMemwb;
+    if (!stallId && !stallMem) {
+        idex = nextIdex;
+    } else if (stallId && !stallMem) {
+        // insert bubble
+        idex = IDEX{};
+    }
+
+    if (!stallMem) {
+        exmem = nextExmem;
+        memwb = nextMemwb;
+    }
 
     return cycleStatus;
 }
@@ -1027,7 +933,7 @@ int finalizeSimulator() {
     // s.icMisses = ic->getMisses();
     // s.dcHits = dc->getHits();
     // s.dcMisses = dc->getMisses();
-    //printSimStats(s)
+    // printSimStats(s)
 
     // ic->drain();
     // dc->drain();
