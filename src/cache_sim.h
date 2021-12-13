@@ -39,7 +39,7 @@ class Cache {
         MemoryStore *mainMem;
     public:
         Cache(CacheConfig &cache, MemoryStore *mem);
-        void getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, uint32_t cycle);
+        int getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, uint32_t cycle);
         int setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, uint32_t cycle);
         uint32_t getHits();
         uint32_t getMisses();

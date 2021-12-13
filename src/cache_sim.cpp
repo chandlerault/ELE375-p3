@@ -63,10 +63,9 @@ Cache::Cache(CacheConfig &config, MemoryStore *mem) {
 }
 
  // address given is the address of the first byte
-void Cache::getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, uint32_t cycle){
+int Cache::getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, uint32_t cycle){
     bool miss;
     value = 0;
-    value = UINT64_MAX;
 
     // look at each byte  
     for(int i; i< size; i++){
@@ -82,6 +81,7 @@ void Cache::getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size,
         }
         value = value | (byte << ((size-1-i)*8));
     }
+    return miss;
 }
 
     // cache read miss procedure:
@@ -122,9 +122,9 @@ int Cache::setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, ui
 int Cache::getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle){
     uint32_t addressCopy = address;
     uint32_t addrTag = addressCopy >> (tagStart);
-    uint32_t addressCopy = address;
+    addressCopy = address;
     uint32_t addrIndex = (addressCopy << (tagEnd - indexEnd)) >> (ADDRESS_LEN - indexEnd - indexStart);
-    uint32_t addressCopy = address;
+    addressCopy = address;
     uint32_t blockOffset = addressCopy << (ADDRESS_LEN - offsetEnd) >> (ADDRESS_LEN - offsetEnd- offsetStart);
 
         // iterate through each block in a set

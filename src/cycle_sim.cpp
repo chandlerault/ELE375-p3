@@ -586,8 +586,7 @@ bool handleMem(EXMEM &exmem)
         }
         break;
     case OP_LBU:
-        dcache->getCacheValue(addr, data, BYTE_SIZE, pipeState.cycle);
-        if (data == UINT64_MAX)
+        if (dcache->getCacheValue(addr, data, BYTE_SIZE, pipeState.cycle))
         {
             return true;
         }
@@ -595,8 +594,7 @@ bool handleMem(EXMEM &exmem)
             exmem.regWriteValue = data;
         break;
     case OP_LHU:
-        dcache->getCacheValue(addr, data, HALF_SIZE, pipeState.cycle);
-        if (data == UINT64_MAX)
+        if (dcache->getCacheValue(addr, data, HALF_SIZE, pipeState.cycle))
         {
 
             return true;
@@ -605,8 +603,7 @@ bool handleMem(EXMEM &exmem)
             exmem.regWriteValue = data;
         break;
     case OP_LW:
-        dcache->getCacheValue(addr, data, WORD_SIZE, pipeState.cycle);
-        if (data == UINT64_MAX)
+        if (dcache->getCacheValue(addr, data, WORD_SIZE, pipeState.cycle))
         {
             return true;
         }
@@ -700,12 +697,13 @@ CycleStatus runCycle()
 
     // instructionFetch
     uint32_t instruction;
-    icache->getCacheValue(pc, instruction, MemEntrySize::WORD_SIZE, pipeState.cycle);
-    instruction = haltSeen ? 0 : instruction;
-    if (instruction == UINT64_MAX)
+    
+    if (icache->getCacheValue(pc, instruction, MemEntrySize::WORD_SIZE, pipeState.cycle))
     {
         stallIf = true;
     }
+    instruction = haltSeen ? 0 : instruction;
+
     nextIfid.pc = pc;
     uint32_t nextPc = pc + 4;
     nextIfid.instruction = instruction;
