@@ -719,6 +719,7 @@ CycleStatus runCycle()
             nextPc = EXCEPTION_ADDR;
             nextIfid.instruction = 0;
             ifid.instruction = 0;
+            haltSeen = false;
             nextIdex.instructionData.data.rData = RData{};
             break;
         }
@@ -799,6 +800,7 @@ CycleStatus runCycle()
         nextPc = EXCEPTION_ADDR;
         ifid.instruction = 0;
         nextIfid.instruction = 0; // squash instruction after illegal instruction exception
+        haltSeen = false;
     }
     nextIdex.instruction = ifid.instruction;
 
