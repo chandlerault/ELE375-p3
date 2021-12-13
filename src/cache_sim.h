@@ -4,7 +4,7 @@ using std::vector;
 
 
 struct metaData {
-    int valid;
+    bool valid;
     bool dirty; 
     uint32_t tag;
     uint32_t lru;
