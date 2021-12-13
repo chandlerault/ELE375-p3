@@ -67,7 +67,7 @@ Cache::Cache(CacheConfig &config, MemoryStore *mem) {
 
  // address given is the address of the first byte
 int Cache::getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, uint32_t cycle){
-    bool miss;
+    int miss;
     value = 0;
 
     // look at each byte  
@@ -103,7 +103,7 @@ int Cache::getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, 
 int Cache::setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, uint32_t cycle) {
     uint32_t mask = 0xFF;
     uint32_t latency = 0;
-    bool miss;
+    int miss;
     for (uint32_t i = 0; i < size; i++) {
         uint32_t byte = (value & (mask << ((size-1-i)*8))) >> ((size-1-i)*8);
         //uint32_t byte;
