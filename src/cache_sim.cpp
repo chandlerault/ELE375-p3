@@ -7,7 +7,6 @@
 #include "MemoryStore.h"
 #include "RegisterInfo.h"
 #include "EndianHelpers.h"
-#include "CacheConfig.h"
 #include "DriverFunctions.h"
 
 #include "cache_sim.h"
