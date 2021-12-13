@@ -135,7 +135,7 @@ CacheByteResult Cache::getCacheByte(uint32_t address, uint32_t & value, uint32_t
             updateLRU(addrIndex, i);
             // helper function to keep track of LRU block for each set in cache
            // updateLRU();
-            return CacheByteResult{true, metaDataBits[addrIndex][i].cycleReady < cycle};
+            return CacheByteResult{true, metaDataBits[addrIndex][i].cycleReady + missLatency < cycle};
         } 
     }
     // gets data from memory after a cache miss 
@@ -162,7 +162,7 @@ CacheByteResult Cache::setCacheByte(uint32_t address, uint32_t value, uint32_t c
             cacheData[addrIndex][i][blockOffset] = (uint8_t) value;
             metaDataBits[addrIndex][i].dirty = 1;
             updateLRU(addrIndex, i);
-            return CacheByteResult{true, metaDataBits[addrIndex][i].cycleReady < cycle};
+            return CacheByteResult{true, metaDataBits[addrIndex][i].cycleReady + missLatency < cycle};
         }
     }
 
