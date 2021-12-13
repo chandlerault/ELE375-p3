@@ -186,7 +186,7 @@ uint32_t Cache::cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, ui
     
     uint32_t setBlock;
     // compare each block in a set to see which one is LRU
-    if((metaDataBits[addrIndex][0].lru > metaDataBits[addrIndex][1].lru) || (metaDataBits[addrIndex][0].valid && !metaDataBits[addrIndex][1].valid)) {
+    if((metaDataBits[addrIndex][0].lru > metaDataBits[addrIndex][1].lru) || (cacheType == TWO_WAY_SET_ASSOC && !metaDataBits[addrIndex][1].valid)) {
         setBlock = 1;
     } else {
         setBlock = 0;
