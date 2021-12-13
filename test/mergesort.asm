@@ -76,7 +76,7 @@ mergeloop:
 	
 	move	$a0, $s1		# Load the argument for the element to move
 	move	$a1, $s0		# Load the argument for the address to move it to
-	jal	shift			# Shift the element to the new position 
+	jal		shift			# Shift the element to the new position 
 	
 	addi	$s1, $s1, 4		# Increment the second half index
 noshift:
@@ -124,15 +124,17 @@ prloop:
 	lw	$t3,info($t2)			# Get the pointer
 	lw	$a0,0($t3)			# Get the value pointed to and store it for printing
 	li	$v0,1				
-	syscall					# Print the value
+							#syscall					# Print the value
 	la	$a0,eol				# Set the value to print to the newline
 	li	$v0,4				
-	syscall					# Print the value
+							# syscall					# Print the value
 	addi	$t0,$t0,1			# Increment the current index
 	b	prloop				# Run through the print block again
+
 prdone:						# We are finished
 	li	$v0,10
-	syscall
+
+							# syscall
 	.data
 eol:	.asciiz	"\n"
 
