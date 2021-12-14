@@ -189,7 +189,7 @@ int Cache::setCacheByte(uint32_t address, uint32_t value, uint32_t cycle) {
     }
 
     // WRITE MISS
-    int newBlock = cacheMiss(address, addrTag, addrIndex, blockOffset);
+    uint32_t newBlock = cacheMiss(address, addrTag, addrIndex, blockOffset);
     cacheData[addrIndex][newBlock][blockOffset] = (uint8_t) value;
     metaDataBits[addrIndex][newBlock].dirty = 1;
     metaDataBits[addrIndex][newBlock].cycleReady = cycle + missLatency;
