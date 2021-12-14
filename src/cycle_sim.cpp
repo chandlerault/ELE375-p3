@@ -999,6 +999,8 @@ CycleStatus runCycle()
         regs[memwb.regToWrite] = memwb.regWriteValue;
     }
 
+    nextIfid.pc = pc;
+
     // instructionFetch
     uint32_t instruction = 0;
 
@@ -1023,8 +1025,9 @@ CycleStatus runCycle()
         }
     }
 
-    nextIfid.pc = pc;
-    uint32_t nextPc = pc + 4;
+    if (fetchHaltCycles <= 0) uint32_t nextPc = pc + 4;
+
+    
     nextIfid.instruction = instruction;
     if (instruction == 0xfeedfeed)
         haltSeen = true;
