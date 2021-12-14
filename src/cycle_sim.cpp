@@ -693,6 +693,7 @@ IDEX idex;
 EXMEM exmem;
 MEMWB memwb;
 bool haltSeen;
+int fetchHaltCycles;
 int memHaltCycles;
 uint32_t lastPcFetch;
 uint32_t lastInstructionFetch;
@@ -712,6 +713,7 @@ int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mai
     exmem = EXMEM{};
     memwb = MEMWB{};
     haltSeen = false;
+    fetchHaltCycles = 0;
     memHaltCycles = 0;
     lastPcFetch = UINT32_MAX;
     lastInstructionFetch = 0;
@@ -982,6 +984,7 @@ CycleStatus runCycle()
 
     // if simulated cache miss time is not over yet
     if (--memHaltCycles > 0) {
+        if (fetchHaltCycles > 0) fetchHaltCycles--;
         pipeState.cycle++;
         simStats.totalCycles++;
         return cycleStatus;
@@ -1006,14 +1009,14 @@ CycleStatus runCycle()
         instruction = lastInstructionFetch;
     }
 
-    else if (!haltSeen)
+    else if (!haltSeen && --fetchHaltCycles <= 0)
     {
         auto delay = icache->getCacheValue(pc, instruction, MemEntrySize::WORD_SIZE, pipeState.cycle);
         if (delay)
         {
             // cache miss, halt
             stallIf = true;
-            memHaltCycles = std::max(memHaltCycles, delay);
+            fetchHaltCycles = delay;
         } else {
             lastPcFetch = pc;
             lastInstructionFetch = instruction;
@@ -1199,7 +1202,7 @@ CycleStatus runCycle()
         handleMemForwarding(exmem.instructionData, memwb);
         auto delay = handleMem(exmem);
         if (delay) {
-            memHaltCycles = std::max(memHaltCycles, delay);
+            memHaltCycles = delay;
             stallMem = true;
         }
     }
