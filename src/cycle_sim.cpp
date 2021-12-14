@@ -27,28 +27,18 @@ struct metaData {
 
 class Cache {
     private:
-        //vector<uint32_t> tags;
-        //vector<uint32_t> valid;
-        // cacheBlock is uint8_t array
-        // index is brings us to right block and block offset brings us to the right byte 
+        // stores cache data for each block accessed by index, assoc value, and block offset
         vector<vector<vector<uint8_t>>> cacheData;
-        // metadata unique block, struct of tag, valid , dirty bits
-        // dimensions of 2d array is numSet x 2 blocks for 2 way
-        // dimensions fof 2d array is just index and 1 block for direct map
+        // metadata for each cache block accessed by index and set block number if applicable 
         vector<vector<metaData>> metaDataBits;
         uint32_t hits;
         uint32_t misses;
-        uint32_t address;
         CacheType cacheType;
-        // write back cache 
-        // dirty bit set everytime write into cache line 
-        // if dirty bit is set + valid bit, throw out block and update block in memory 
-        uint8_t lru;
-        uint32_t numBlocks, numSets, blockSize, cacheSize, missLatency, assoc;
+        uint32_t address, numBlocks, numSets, blockSize, cacheSize, missLatency, assoc;
         int offsetStart, offsetEnd, indexStart, indexEnd, tagStart, tagEnd;
-        // funcitons to set valid bit, lru, dirty, 
         int setCacheByte(uint32_t address, uint32_t value, uint32_t cycle);
         int getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle);
+        uint32_t cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, uint32_t blockOffset);
         void updateLRU(int addrIndex, int recentlyUsed);
         MemoryStore *mainMem;
     public:
@@ -57,7 +47,6 @@ class Cache {
         int setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, uint32_t cycle);
         uint32_t getHits();
         uint32_t getMisses();
-        uint32_t cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, uint32_t blockOffset);
         void drain();
         ~Cache();
 };
@@ -86,9 +75,6 @@ Cache::Cache(CacheConfig &config, MemoryStore *mem) {
         metaDataBits.emplace_back();
         for (uint32_t j = 0; j < assoc; j++) {
             metaDataBits[i].emplace_back();
-            // metaDataBits[i][j].tag = 0;
-            // metaDataBits[i][j].dirty  = 0;
-            // metaDataBits[i][j].lru = 0;
         }
     }
 
@@ -135,17 +121,6 @@ int Cache::getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, 
     return result;
 }
 
-    // cache read miss procedure:
-    // check the dirty bit if its 1 we write back, if its 0 we dont write back
-    // overwrite contents of cache block by grabbing data from memory
-    // overwrite the tag in our metadata 
-    // when replacing :  make valid bit 1,  dirty bit 0,  update lru 
-    // make a helper function to run the cache miss procedure (use for both getCacheValue and setCacheValue)
-    // write miss
-    // set dirty to 1 every time you write the cache line
-    
-    // do we count the hits for each byte or for each word?
-    // what should we be returning for the getCache function? the value of the word?
     
 
 int Cache::setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, uint32_t cycle) {
@@ -153,7 +128,6 @@ int Cache::setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, ui
     int result;
     for (uint32_t i = 0; i < size; i++) {
         uint32_t byte = (value & (mask << ((size-1-i)*8))) >> ((size-1-i)*8);
-        //uint32_t byte;
         result = setCacheByte(address + i, byte, cycle);
         if(i ==0){
             if(result == 0) {
@@ -182,8 +156,6 @@ int Cache::getCacheByte(uint32_t address, uint32_t & value, uint32_t cycle){
             if (metaDataBits[addrIndex][i].cycleReady > cycle) return missLatency;
             value = cacheData[addrIndex][i][blockOffset];
             updateLRU(addrIndex, i);
-            // helper function to keep track of LRU block for each set in cache
-           // updateLRU();
             return 0;
         } 
     }
@@ -204,7 +176,8 @@ int Cache::setCacheByte(uint32_t address, uint32_t value, uint32_t cycle) {
 
     // loop through blocks in the set, starting at startBlock
     for (uint32_t i = 0; i < assoc; i++) {
-        if (metaDataBits[addrIndex][i].valid  && metaDataBits[addrIndex][i].tag == addrTag) { // WRITE HIT
+        // WRITE HIT
+        if (metaDataBits[addrIndex][i].valid  && metaDataBits[addrIndex][i].tag == addrTag) { 
             if (metaDataBits[addrIndex][i].cycleReady > cycle) {
                 return missLatency; // we've hit before, but are emulating latency 
             }
@@ -223,12 +196,7 @@ int Cache::setCacheByte(uint32_t address, uint32_t value, uint32_t cycle) {
     return missLatency;
 }
 
-uint32_t Cache::cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, uint32_t blockOffset) {
-    // 1. replace appropriate block based on lru
-    // 2. check the dirty bit to see if we need to do write back)
-    // 3. execute write back
-    // 4. overwrite data in cache 
-    
+uint32_t Cache::cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, uint32_t blockOffset) { 
     uint32_t setBlock;
     // compare each block in a set to see which one is LRU
     if((metaDataBits[addrIndex][0].lru > metaDataBits[addrIndex][1].lru) || (cacheType == TWO_WAY_SET_ASSOC && !metaDataBits[addrIndex][1].valid)) {
@@ -240,23 +208,20 @@ uint32_t Cache::cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, ui
     // check if dirty, if so then write-back
     if (metaDataBits[addrIndex][setBlock].dirty) {
         uint32_t memAddr = (metaDataBits[addrIndex][setBlock].tag << tagStart) | (addrIndex << indexStart);
-        // is this correct?????
-        // loop by each byte and set memory based on whats written in cache data 
         for(uint32_t byteOffset = 0; byteOffset < blockSize; byteOffset++){
             mainMem->setMemValue(memAddr + byteOffset, (uint32_t) cacheData[addrIndex][setBlock][byteOffset], BYTE_SIZE);
         }
-
-        // mainMem->setMemValue(address, cacheData[addrIndex][setBlock][blockOffset], BYTE_SIZE);
     }
-  
+    
     uint32_t blockStartMemAddr = (address >> offsetEnd) << offsetEnd; // removing byte offset from address
+
     // loop by each byte read from memory and write it into cache to over write data
      for (uint32_t byteOffset = 0; byteOffset < blockSize; byteOffset++) {
         uint32_t temp;
         mainMem->getMemValue(blockStartMemAddr + byteOffset, temp, BYTE_SIZE);
         cacheData[addrIndex][setBlock][byteOffset] = (uint8_t) temp;
     }
-    // cacheData[addrIndex][setBlock][blockOffset] = mainMem->getMemValue(address, value, BYTE_SIZE);
+    
     metaDataBits[addrIndex][setBlock].dirty = 0;
     metaDataBits[addrIndex][setBlock].valid = 1;
     updateLRU(addrIndex, setBlock);
@@ -265,9 +230,10 @@ uint32_t Cache::cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, ui
     
 }
 
+// for a 2 way set, updates most recently used cache block as a one and least recently used as zero
 void Cache::updateLRU(int addrIndex, int recentlyUsed){
     for(uint32_t i = 0; i < assoc; i++) {
-        if(metaDataBits[addrIndex][recentlyUsed].lru > metaDataBits[addrIndex][recentlyUsed].lru) {
+        if(metaDataBits[addrIndex][i].lru > metaDataBits[addrIndex][recentlyUsed].lru) {
             metaDataBits[addrIndex][i].lru -= 1;
         }
     }
@@ -282,6 +248,7 @@ uint32_t Cache::getMisses() {
     return misses;
 }
 
+// writeback to memory all cache blocks that have a set valid/dirty bit
 void Cache::drain() {
     for (uint32_t setNum = 0; setNum < numSets; setNum++) {
         for(uint32_t i = 0; i< assoc; i++){
