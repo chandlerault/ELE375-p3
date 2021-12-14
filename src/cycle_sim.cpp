@@ -694,6 +694,8 @@ EXMEM exmem;
 MEMWB memwb;
 bool haltSeen;
 int memHaltCycles;
+uint32_t lastPcFetch;
+uint32_t lastInstructionFetch;
 CycleStatus cycleStatus{};
 SimulationStats simStats{};
 
@@ -711,6 +713,8 @@ int initSimulator(CacheConfig &icConfig, CacheConfig &dcConfig, MemoryStore *mai
     memwb = MEMWB{};
     haltSeen = false;
     memHaltCycles = 0;
+    lastPcFetch = UINT32_MAX;
+    lastInstructionFetch = 0;
     cycleStatus = CycleStatus{};
     simStats = SimulationStats{};
     return 0;
@@ -995,13 +999,24 @@ CycleStatus runCycle()
     // instructionFetch
     uint32_t instruction = 0;
 
-    if (!haltSeen)
+    // if something else stalls the pipeline, we rerun the instruction fetch stage
+    // however, that results in getting a cache value again that should be stored in the pipeline instead
+    // this avoids that by maintaining a "cache" for the last fetched instruction that won't increment icache hits
+    if (lastPcFetch == pc) {
+        instruction = lastInstructionFetch;
+    }
+
+    else if (!haltSeen)
     {
         auto delay = icache->getCacheValue(pc, instruction, MemEntrySize::WORD_SIZE, pipeState.cycle);
         if (delay)
         {
+            // cache miss, halt
             stallIf = true;
             memHaltCycles = std::max(memHaltCycles, delay);
+        } else {
+            lastPcFetch = pc;
+            lastInstructionFetch = instruction;
         }
     }
 
