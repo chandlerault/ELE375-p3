@@ -1,4 +1,4 @@
-for value in feed_end add_immediate and_immediate r load store branch j midterm fib load_use
+for value in feed_end add_immediate and_immediate r load store branch j midterm fib load_use invalid_instruction arithmetic_exception
 do
     echo $value
     bin/mips-linux-gnu-as test/$value.asm -o $value.elf
