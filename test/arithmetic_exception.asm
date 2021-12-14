@@ -1,0 +1,20 @@
+.set noreorder
+li     $t0, 0x7fffffff
+li     $t1, 2
+li     $t9, -3
+addu   $t2, $t0, $t1 
+subu   $t3, $t0, $t9 
+addiu  $t4, $t0, 4
+
+li     $ra, 36 
+add    $t5, $t0, $t1 
+li     $ra, 44 
+sub    $t6, $t0, $t9 
+li     $ra, 52 
+addi   $t7, $t0, 4 
+.word  0xfeedfeed
+
+.space 0x7fd0
+
+jr     $ra
+addi   $s0, $s0, 1

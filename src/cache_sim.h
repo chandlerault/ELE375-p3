@@ -4,7 +4,7 @@ using std::vector;
 
 
 struct metaData {
-    int valid;
+    bool valid;
     bool dirty; 
     uint32_t tag;
     uint32_t lru;
@@ -39,11 +39,11 @@ class Cache {
         MemoryStore *mainMem;
     public:
         Cache(CacheConfig &cache, MemoryStore *mem);
-        void getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, uint32_t cycle);
+        int getCacheValue(uint32_t address, uint32_t & value, MemEntrySize size, uint32_t cycle);
         int setCacheValue(uint32_t address, uint32_t value, MemEntrySize size, uint32_t cycle);
         uint32_t getHits();
         uint32_t getMisses();
-        int cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, uint32_t blockOffset);
+        uint32_t cacheMiss(uint32_t address, uint32_t tag, uint32_t addrIndex, uint32_t blockOffset);
         void drain();
         ~Cache();
 };
