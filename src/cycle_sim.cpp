@@ -1025,8 +1025,7 @@ CycleStatus runCycle()
         }
     }
 
-    if (fetchHaltCycles <= 0) uint32_t nextPc = pc + 4;
-
+    uint32_t nextPc = fetchHaltCycles > 0 ? pc : pc + 4;
     
     nextIfid.instruction = instruction;
     if (instruction == 0xfeedfeed)
