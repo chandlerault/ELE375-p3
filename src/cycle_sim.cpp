@@ -388,57 +388,9 @@ enum FUN_IDS
     FUN_SUBU = 0x23
 };
 
-/* // Cache values stored 
-enum CACHE_VALUE {
-   ICACHE;
-   DCACHE;
-}*/
-
 //Static global variables...
 static uint32_t regs[NUM_REGS];
 
-// uint8_t getSign(uint32_t value)
-// {
-//     return (value >> 31) & 0x1;
-// }
-
-// int doAddSub(uint8_t rd, uint32_t s1, uint32_t s2, bool isAdd, bool checkOverflow)
-// {
-//     bool overflow = false;
-//     int32_t result = 0;
-
-//     if (isAdd)
-//     {
-//         result = static_cast<int32_t>(s1) + static_cast<int32_t>(s2);
-//     }
-//     else
-//     {
-//         result = static_cast<int32_t>(s1) - static_cast<int32_t>(s2);
-//     }
-
-//     if (checkOverflow)
-//     {
-//         if (isAdd)
-//         {
-//             overflow = getSign(s1) == getSign(s2) && getSign(s2) != getSign(result);
-//         }
-//         else
-//         {
-//             overflow = getSign(s1) != getSign(s2) && getSign(s2) == getSign(result);
-//         }
-//     }
-
-//     if (overflow)
-//     {
-//         //Inform the caller that overflow occurred so it can take appropriate action.
-//         return OVERFLOW;
-//     }
-
-//     //Otherwise update state and return success.
-//     regs[rd] = static_cast<uint32_t>(result);
-
-//     return 0;
-// }
 
 void fillRegisterState(RegisterInfo &reg)
 {
